@@ -21,32 +21,26 @@ def _eq(self, other, attribs):
 class SpeedRun:
     def __init__(self, name, _id=None, splits=None):
         self.name = name
-        self._id = _id
+        self.id = _id
         self.splits = tuple(splits) if splits else self._get_splits()
 
     def _get_splits(self):
         assert self.id
-        cursor().execute('SELECT name, idx, start_time, end_time from splits where run_id=?', (self.id,))
-        return tuple(Split(self.name, *s) for s in cursor().fetchall())
-
-    @property
-    def id(self):
-        if self._id is None:
-            self._id = generate_id('runs')
-        return self._id
+        cursor().execute('SELECT idx, start_time, end_time FROM splits WHERE run_id=? ORDER BY idx ASC', (self.id,))
+        data = cursor().fetchall()
+        return tuple(Split(self.name, *s) for s in data)
 
     @property
     def total_time(self):
-        tdelta = self.splits[-1].end_time - self.splits[0].start_time
-        return tdelta.total_seconds()
+        return self.splits[-1].end_time - self.splits[0].start_time
 
     def push(self):
         cursor().execute(
-            'INSERT INTO runs VALUES (?, ?, ?, ?)', (self.id, self.name, self.splits[0].start_time, self.total_time)
+            'INSERT INTO runs VALUES (?, ?, ?, ?)', (self.id, self.name, self.splits[0].start_time, self.total_time.total_seconds())
         )
-        db.commit()
         for s in self.splits:
-            s._push(self._id)
+            s._push(self.id)
+        db.commit()
 
     def __repr__(self):
         return _repr(self, ('name', 'id', 'splits'))
@@ -56,7 +50,7 @@ class SpeedRun:
 
 
 class Split:
-    def __init__(self, run_name, split_name, index, start_time=None, end_time=None):
+    def __init__(self, run_name, index, start_time=None, end_time=None, split_name=None):
         self.run_name = run_name
         self.name = split_name
         self.index = index
@@ -72,7 +66,12 @@ class Split:
             date, time = t.split(' ')
             year, month, day = date.split('-')
             hours, mins, secs = time.split(':')
-            return datetime.datetime(int(year), int(month), int(day), int(hours), int(mins), int(secs))
+            if '.' in secs:
+                secs, usecs = secs.split('.')
+                usecs += '0' * (6 - len(usecs))
+            else:
+                usecs = 0
+            return datetime.datetime(int(year), int(month), int(day), int(hours), int(mins), int(secs), int(usecs))
 
     @property
     def time_elapsed(self):
@@ -80,17 +79,17 @@ class Split:
             return self.end_time - self.start_time
 
     def _push(self, run_id):
-        assert all((self.run_name, self.name, self.index, self.start_time, self.end_time))
+        assert all((self.run_name, self.index, self.start_time, self.end_time))
         cursor().execute(
-            'INSERT INTO splits VALUES (?, ?, ?, ?, ?, ?)',
-            (generate_id('splits'), run_id, self.name, self.index, self.start_time, self.end_time)
+            'INSERT INTO splits VALUES (?, ?, ?, ?, ?)',
+            (generate_id('splits'), run_id, self.index, self.start_time, self.end_time)
         )
 
     def __repr__(self):
         return _repr(self, ('name', 'index', 'time_elapsed'))
 
     def __eq__(self, other):
-        return _eq(self, other, ('run_name', 'name', 'index', 'start_time', 'end_time'))
+        return _eq(self, other, ('run_name', 'index', 'start_time', 'end_time'))
 
 
 def generate_id(table_name):
@@ -119,7 +118,7 @@ def connect():
     _cursor.execute('CREATE TABLE IF NOT EXISTS runs (id text UNIQUE, name text, start_time text, total_time numeric)')
     _cursor.execute(
         'CREATE TABLE IF NOT EXISTS splits ('
-        'id text UNIQUE, run_id numeric REFERENCES runs(id), name text, idx numeric, start_time text, end_time text'
+        'id text UNIQUE, run_id numeric REFERENCES runs(id), idx numeric, start_time text, end_time text'
         ')'
     )
 
@@ -132,9 +131,10 @@ def cursor():
 
 
 def get_best_run(name):
-    cursor().execute('SELECT name, id FROM runs WHERE name=? ORDER BY total_time DESC', (name,))
-    name, _id = cursor().fetchone()
-    return SpeedRun(name, _id)
+    cursor().execute('SELECT id FROM runs WHERE name=? ORDER BY total_time ASC', (name,))
+    data = cursor().fetchone()
+    if data:
+        return SpeedRun(name, data[0])
 
 
 def _get_average_elapsed_time(splits):
@@ -155,7 +155,6 @@ def get_average_run(name):
         average_splits.append(
             Split(
                 name,
-                template_splits[idx].name,
                 template_splits[idx].index,
                 null_time,
                 null_time + _get_average_elapsed_time([r.splits[idx] for r in runs])
