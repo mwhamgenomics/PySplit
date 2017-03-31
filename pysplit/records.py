@@ -59,6 +59,10 @@ class Split:
 
     @staticmethod
     def _to_datetime(t):
+        """
+        Convert a string formatted 'yyyy-mm-dd hh:mm:ss.ms' to a datetime if needed.
+        :param str t:
+        """
         if type(t) is datetime.datetime:
             return t
 
@@ -79,6 +83,10 @@ class Split:
             return self.end_time - self.start_time
 
     def _push(self, run_id):
+        """
+        Push split data.
+        :param str run_id: speedrun ID to associate with this split
+        """
         assert all((self.run_name, self.index, self.start_time, self.end_time))
         cursor().execute(
             'INSERT INTO splits VALUES (?, ?, ?, ?, ?)',
@@ -93,6 +101,10 @@ class Split:
 
 
 def generate_id(table_name):
+    """
+    Return a string not already present in the id column of a given table
+    :param str table_name: 'runs' or 'splits'
+    """
     new_id = _random_string()
 
     cursor().execute('SELECT id from %s WHERE id=?' % table_name, (new_id,))
@@ -118,7 +130,7 @@ def connect():
     _cursor.execute('CREATE TABLE IF NOT EXISTS runs (id text UNIQUE, name text, start_time text, total_time numeric)')
     _cursor.execute(
         'CREATE TABLE IF NOT EXISTS splits ('
-        'id text UNIQUE, run_id numeric REFERENCES runs(id), idx numeric, start_time text, end_time text'
+        'id text UNIQUE, run_id text REFERENCES runs(id), idx numeric, start_time text, end_time text'
         ')'
     )
 
@@ -144,6 +156,10 @@ def _get_average_elapsed_time(splits):
 
 
 def get_average_run(name):
+    """
+    Return a hypothetical SpeedRun, where the splits are averages across all previous runs.
+    :param str name:
+    """
     cursor().execute('SELECT id FROM runs WHERE name=?', (name,))
     data = cursor().fetchall()
     runs = [SpeedRun(name, d[0]) for d in data]

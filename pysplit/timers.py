@@ -1,7 +1,15 @@
 import datetime
 import threading
+import yaml
 from time import sleep
+from os.path import expanduser, isfile
 from pysplit import records
+
+
+level_names = {}
+cfg = expanduser('~/.pysplit.yaml')
+if isfile(cfg):
+    level_names = yaml.safe_load(open(cfg, 'r'))
 
 
 def now():
@@ -65,6 +73,11 @@ class SimpleTimer(threading.Thread):
         print('Total  ' + ' ' * (self.level_offset - 5) + self.render_timedelta(self.total_time))
 
     def render_timedelta(self, timedelta, colour=None):
+        """
+        Format a timedelta as, e.g, '01:30:25.50' or '-00:03:43.24'
+        :param datetime.timedelta timedelta:
+        :param str colour: a value from self.colours
+        """
         if timedelta is None:
             return ''
 
@@ -83,7 +96,7 @@ class SimpleTimer(threading.Thread):
         return self.render_text('%s%d:%02d:%02d.%02d' % (sign, hrs, mins, sec, usec), colour)
 
     def _get_splits(self, split_config):
-        names = split_config  # if type(split_config) in (list, tuple) else config[self.name] TODO: add name config
+        names = split_config if type(split_config) in (list, tuple) else level_names[self.name]
         return [records.Split(self.name, names.index(n) + 1, split_name=n) for n in names]
 
     @property
@@ -146,6 +159,10 @@ class PBTimer(SimpleTimer):
         return self.render_comparison(now() - best_possible_end)
 
     def render_comparison(self, timedelta):
+        """
+        Format a timedelta as, e.g, '+01:30:25.50' or '-00:03:43.24'. Will be coloured red if + and green if -.
+        :param datetime.timedelta timedelta:
+        """
         float_secs = (86400 * timedelta.days) + timedelta.seconds + (timedelta.microseconds / 1000000)
         if float_secs < 0:
             float_secs *= -1
@@ -159,7 +176,6 @@ class PBTimer(SimpleTimer):
         hrs, mins = divmod(mins, 60)
         sec, usec = divmod(sec, 1)
         usec *= 100
-
         return self.render_text('%s%d:%02d:%02d.%02d' % (sign, hrs, mins, sec, usec), colour)
 
     def render_current_time(self):
