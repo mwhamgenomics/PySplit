@@ -11,35 +11,44 @@ Optional arguments:
 - `--nocolour` - do not use colours in stdout
 - `--practice` - use SimpleTimer, which does not load or save times
 
-## Configuration
-Configurations for level names can be supplied in `~/.pysplit.yaml`. To add level names for a run, for example:
+PySplit handles `KeyboardInterrupt` and `EOFError`, so the timer can be stopped with `ctrl-C` or `ctrl-D`.
 
-    'Halo 1 Legendary':
-      - Pillar of Autumn
-      - Halo
-      - Truth and Reconciliation
-      - Silent Cartographer
-      - Assault on the Control Room
-      - 343 Guilty Spark
-      - The Library
-      - Two Betrayals
-      - Keyes
-      - The Maw
+## Configuration
+Configurations for level names can be supplied in `~/.pysplit.yaml`. To add level names for a run category, for example
+Halo 1 Legendary, add the category name with a list of names under `level_names`:
+
+    level_names:
+        'Halo 1 Legendary':
+          - Pillar of Autumn
+          - Halo
+          - Truth and Reconciliation
+          - Silent Cartographer
+          - Assault on the Control Room
+          - 343 Guilty Spark
+          - The Library
+          - Two Betrayals
+          - Keyes
+          - The Maw
 
 Because PySplit saves the index of each split (i.e, whether it is level 1, 2, etc.) and not the name, level names can
-be changed at any time - just make sure the list of levels is still the same length:
+be changed at any time - just make sure the list of levels is still the same length. You can also automatically assign a
+run category's level names to another category by specifying a category name instead of a list of level names.
 
-    'Halo 1 Legendary':
-      - Reset here a lot
-      - (Don't) save marines
-      - TnR
-      - Choke door launch here
-      - AotCR
-      - 343GS
-      - SO MUCH FLOOD
-      - Lose run here
-      - Keyes bump
-      - Warthog run
+    level_names:
+        'Halo 1 Legendary':
+          - Reset here a lot
+          - (Don't) save marines
+          - TnR
+          - Choke door launch here
+          - AotCR
+          - 343GS
+          - SO MUCH FLOOD
+          - Lose run here
+          - Keyes bump
+          - Warthog run
+
+        'Halo 1 Easy': 'Halo 1 Legendary'
+
 
 ## About saving split data
 By default, PySplit uses a splits file in `~/.pysplit.sqlite`. A PySplit splits file is a SQLite database with the

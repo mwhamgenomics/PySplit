@@ -85,7 +85,7 @@ class TestPBTimer(TestCase):
         with patch('builtins.print') as p:
             with patched_then:
                 self.timer.render_current_time()
-                p.assert_called_with('level_1  0:01:01.50  0:01:01.50  -0:04:28.50  0:05:30.00', end='\r')
+                p.assert_called_with('level_1  0:01:01.50  0:01:01.50  0:05:30.00 (-0:04:28.50)', end='\r')
             with patch('pysplit.timers.now', return_value=datetime.datetime(2017, 3, 24, 19, 6)):
                 self.timer.render_current_time()
-                p.assert_called_with('level_1  0:06:00.00  0:06:00.00  +0:00:30.00  0:05:30.00', end='\r')
+                p.assert_called_with('level_1  0:06:00.00  0:06:00.00  0:05:30.00 (+0:00:30.00)', end='\r')

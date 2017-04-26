@@ -6,10 +6,12 @@ from os.path import expanduser, isfile
 from pysplit import records
 
 
-level_names = {}
+config = {}
 cfg = expanduser('~/.pysplit.yaml')
 if isfile(cfg):
-    level_names = yaml.safe_load(open(cfg, 'r'))
+    config = yaml.safe_load(open(cfg, 'r'))
+
+level_names = config.get('level_names', {})
 
 
 def now():
@@ -44,7 +46,9 @@ class SimpleTimer(threading.Thread):
         self.split_idx = 0
         self.total_time = None
         self.start_time = None
+        self.finish_time = None
         self.done = False
+        self.cancel = None
         self.level_offset = max(len(s.name) for s in self.splits)
         self.max_width = self.level_offset + len(self.header)
         self.colour = colour
@@ -66,9 +70,16 @@ class SimpleTimer(threading.Thread):
             self.render_current_time()
             sleep(0.001)
 
-        self.report_total_time()
+        self.finish_time = now()
 
-    def report_total_time(self):
+    def join(self, timeout=None):
+        super().join(timeout)
+        if self.cancel:
+            print('\nCancelled')
+        else:
+            self.finish()
+
+    def finish(self):
         self.total_time = now() - self.start_time
         print('Total  ' + ' ' * (self.level_offset - 5) + self.render_timedelta(self.total_time))
 
@@ -96,7 +107,13 @@ class SimpleTimer(threading.Thread):
         return self.render_text('%s%d:%02d:%02d.%02d' % (sign, hrs, mins, sec, usec), colour)
 
     def _get_splits(self, split_config):
-        names = split_config if type(split_config) in (list, tuple) else level_names[self.name]
+        if type(split_config) in (list, tuple):
+            names = split_config
+        else:
+            c = level_names[self.name]
+            if type(c) is str:
+                c = level_names[c]
+            names = c
         return [records.Split(self.name, names.index(n) + 1, split_name=n) for n in names]
 
     @property
@@ -124,10 +141,10 @@ class SimpleTimer(threading.Thread):
     def render_current_time(self):
         _now = now()
         print(
-            '%s  %s  %s' % (
-                self.current_split.name + ' ' * (self.level_offset - len(self.current_split.name)),
-                self.render_timedelta(_now - self.splits[0].start_time),
-                self.render_timedelta(_now - self.last_split_end)
+            '{name}  {time}  {split}'.format(
+                name=self.current_split.name + ' ' * (self.level_offset - len(self.current_split.name)),
+                time=self.render_timedelta(_now - self.splits[0].start_time),
+                split=self.render_timedelta(_now - self.last_split_end)
             ),
             end='\r'
         )
@@ -139,7 +156,7 @@ class SimpleTimer(threading.Thread):
 
 
 class PBTimer(SimpleTimer):
-    header = SimpleTimer.header + '       Comparison   PersonalBest'
+    header = SimpleTimer.header + '       Best'
 
     def __init__(self, name, split_config, colour=True):
         super().__init__(name, split_config, colour)
@@ -181,24 +198,28 @@ class PBTimer(SimpleTimer):
     def render_current_time(self):
         _now = now()
         print(
-            '%s  %s  %s  %s  %s' % (
-                self.current_split.name + ' ' * (self.level_offset - len(self.current_split.name)),
-                self.render_timedelta(_now - self.splits[0].start_time),
-                self.render_timedelta(_now - self.last_split_end),
-                self.render_current_split_comparison(),
-                self.render_timedelta(self.current_pb_split.time_elapsed)
+            '{name}{spaces}  {time}  {split}  {pb} ({comparison})'.format(
+                name=self.current_split.name,
+                spaces=' ' * (self.level_offset - len(self.current_split.name)),
+                time=self.render_timedelta(_now - self.splits[0].start_time),
+                split=self.render_timedelta(_now - self.last_split_end),
+                pb=self.render_timedelta(self.current_pb_split.time_elapsed),
+                comparison=self.render_current_split_comparison()
             ),
             end='\r'
         )
 
-    def report_total_time(self):
+    def finish(self):
         self.total_time = now() - self.start_time
-        report = 'Total  ' + ' ' * (self.level_offset - 5) + self.render_timedelta(self.total_time)
-        report += ' ' * 14 + self.render_comparison(self.total_time - self.pb.total_time)
-        report += '  ' + self.render_timedelta(self.pb.total_time)
-        print(report)
-
-    def join(self, timeout=None):
-        super().join(timeout)
+        print(
+            '{name}{spaces}  {time}  {split}  {pb} ({comparison})'.format(
+                name='Total',
+                spaces=' ' * (self.level_offset - 5),
+                time=self.render_timedelta(self.total_time),
+                split=' ' * 10,
+                pb=self.render_timedelta(self.pb.total_time),
+                comparison=self.render_comparison(self.total_time - self.pb.total_time),
+            )
+        )
         s = records.SpeedRun(self.name, records.generate_id('runs'), splits=self.splits)
         s.push()
