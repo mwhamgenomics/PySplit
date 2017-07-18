@@ -1,18 +1,12 @@
-import argparse
 from pysplit.timers import SimpleTimer, PBTimer
+from pysplit.config import cfg
 
 
 def main():
-    a = argparse.ArgumentParser()
-    a.add_argument('speedrun_name')
-    a.add_argument('--splits', nargs='+', default=None)
-    a.add_argument('--nocolour', dest='colour', action='store_false')
-    a.add_argument('--practice', action='store_true')
-    args = a.parse_args()
+    cfg.configure()
+    cls = SimpleTimer if cfg['practice'] else PBTimer
 
-    cls = SimpleTimer if args.practice else PBTimer
-
-    s = cls(args.speedrun_name, args.splits, args.colour)
+    s = cls(cfg['speedrun_name'], cfg['split_names'], cfg['colour'])
     s.start()
     try:
         for _ in s.splits:

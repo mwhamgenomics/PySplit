@@ -1,17 +1,7 @@
 import datetime
 import threading
-import yaml
 from time import sleep
-from os.path import expanduser, isfile
 from pysplit import records
-
-
-config = {}
-cfg = expanduser('~/.pysplit.yaml')
-if isfile(cfg):
-    config = yaml.safe_load(open(cfg, 'r'))
-
-level_names = config.get('level_names', {})
 
 
 def now():
@@ -39,10 +29,10 @@ class SimpleTimer(threading.Thread):
         None: '\033[0m'
     }
 
-    def __init__(self, name, split_config, colour=True):
+    def __init__(self, name, split_names, colour=True):
         super().__init__()
         self.name = name
-        self.splits = self._get_splits(split_config)
+        self.splits = self._get_splits(split_names)
         self.split_idx = 0
         self.total_time = None
         self.start_time = None
@@ -106,15 +96,8 @@ class SimpleTimer(threading.Thread):
 
         return self.render_text('%s%d:%02d:%02d.%02d' % (sign, hrs, mins, sec, usec), colour)
 
-    def _get_splits(self, split_config):
-        if type(split_config) in (list, tuple):
-            names = split_config
-        else:
-            c = level_names[self.name]
-            if type(c) is str:
-                c = level_names[c]
-            names = c
-        return [records.Split(self.name, names.index(n) + 1, split_name=n) for n in names]
+    def _get_splits(self, split_names):
+        return [records.Split(self.name, split_names.index(n) + 1, split_name=n) for n in split_names]
 
     @property
     def current_split(self):

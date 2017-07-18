@@ -1,10 +1,11 @@
 from pysplit import timers, records
+from pysplit.config import cfg
 from unittest import TestCase
 from unittest.mock import patch
 from tests.data import speedruns
 import datetime
 
-
+cfg.content = {}
 patched_now = patch('pysplit.timers.now', return_value=records.null_time)
 then = datetime.datetime(2017, 3, 24, 19, 1, 1, 500000)  # 1 min, 1.5 sec later
 patched_then = patch('pysplit.timers.now', return_value=then)

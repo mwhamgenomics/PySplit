@@ -61,3 +61,24 @@ PySplit uses the `sqlite3` Python library to push and pull data from this file. 
 using the `sqlite3` C library:
 
     sqlite> SELECT id, start_time FROM runs WHERE name="Halo 1 Legendary";
+
+
+## Roadmap
+- Recursive aliasing, e.g:
+
+    level_names:
+        'Halo 1 Legendary':
+          - Pillar of Autumn
+          - Halo
+          - ...
+
+        'Halo 1 Easy': 'Halo 1 Legendary'
+        'Halo 1 Normal': 'Halo 1 Easy'
+
+- Unified config/command line arguments
+    - everything apart from the run category should be configurable via either the config file or cmd args
+    - cmd args should take precedence, if present
+- More command line tools for looking at past runs
+    - best run, avg run, best possible run
+- Gold splits
+- Screenshot for intro to docs
