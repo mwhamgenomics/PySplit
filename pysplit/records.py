@@ -3,8 +3,8 @@ import sqlite3
 import string
 from random import choice
 from os.path import expanduser
+from pysplit.config import cfg
 
-record_db = expanduser('~/.pysplit.sqlite')
 db = None
 _cursor = None
 null_time = datetime.datetime(2017, 3, 24, 19)
@@ -19,8 +19,9 @@ def _eq(self, other, attribs):
 
 
 class SpeedRun:
-    def __init__(self, name, _id=None, splits=None):
+    def __init__(self, name, runner, _id=None, splits=None):
         self.name = name
+        self.runner = runner
         self.id = _id
         self.splits = tuple(splits) if splits else self._get_splits()
 
@@ -36,7 +37,8 @@ class SpeedRun:
 
     def push(self):
         cursor().execute(
-            'INSERT INTO runs VALUES (?, ?, ?, ?)', (self.id, self.name, self.splits[0].start_time, self.total_time.total_seconds())
+            'INSERT INTO runs VALUES (?, ?, ?, ?, ?)',
+            (self.id, self.name, self.runner, self.splits[0].start_time, self.total_time.total_seconds())
         )
         for s in self.splits:
             s._push(self.id)
@@ -120,14 +122,14 @@ def _random_string(_len=6):
     return ''.join(choice(string.ascii_lowercase + string.digits) for _ in range(_len))
 
 
-def connect():
+def connect(record_db):
     global db
     global _cursor
 
     db = sqlite3.connect(record_db)
     _cursor = db.cursor()
 
-    _cursor.execute('CREATE TABLE IF NOT EXISTS runs (id text UNIQUE, name text, start_time text, total_time numeric)')
+    _cursor.execute('CREATE TABLE IF NOT EXISTS runs (id text UNIQUE, name text, runner text, start_time text, total_time numeric)')
     _cursor.execute(
         'CREATE TABLE IF NOT EXISTS splits ('
         'id text UNIQUE, run_id text REFERENCES runs(id), idx numeric, start_time text, end_time text'
@@ -138,15 +140,29 @@ def connect():
 def cursor():
     global _cursor
     if _cursor is None:
-        connect()
+        connect(cfg.get('record_db', expanduser('~/.pysplit.sqlite')))
     return _cursor
 
 
-def get_best_run(name):
-    cursor().execute('SELECT id FROM runs WHERE name=? ORDER BY total_time ASC', (name,))
+def get_run(name, run_id):
+    cursor().execute('SELECT runner, id from runs WHERE id=?', (run_id,))
     data = cursor().fetchone()
     if data:
-        return SpeedRun(name, data[0])
+        return SpeedRun(name, *data)
+
+
+def get_pb_run(name):
+    cursor().execute('SELECT runner, id FROM runs WHERE name=? AND runner=? ORDER BY total_time ASC', (name, cfg['runner_name']))
+    data = cursor().fetchone()
+    if data:
+        return SpeedRun(name, *data)
+
+
+def get_best_run(name):
+    cursor().execute('SELECT runner, id FROM runs WHERE name=? ORDER BY total_time ASC', (name,))
+    data = cursor().fetchone()
+    if data:
+        return SpeedRun(name, *data)
 
 
 def _get_average_elapsed_time(splits):
@@ -160,9 +176,9 @@ def get_average_run(name):
     Return a hypothetical SpeedRun, where the splits are averages across all previous runs.
     :param str name:
     """
-    cursor().execute('SELECT id FROM runs WHERE name=?', (name,))
+    cursor().execute('SELECT id FROM runs WHERE name=? AND runner=?', (name, cfg['runner_name']))
     data = cursor().fetchall()
-    runs = [SpeedRun(name, d[0]) for d in data]
+    runs = [SpeedRun(name, cfg['runner_name'], d[0]) for d in data]
 
     template_splits = runs[0].splits
     average_splits = []
@@ -176,4 +192,4 @@ def get_average_run(name):
                 null_time + _get_average_elapsed_time([r.splits[idx] for r in runs])
             )
         )
-    return SpeedRun(name, _id='avg_run', splits=average_splits)
+    return SpeedRun(name, cfg['runner_name'], _id='avg_run', splits=average_splits)

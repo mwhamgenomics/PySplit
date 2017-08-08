@@ -5,15 +5,20 @@ from unittest.mock import patch
 from tests.data import speedruns
 import datetime
 
-cfg.content = {}
 patched_now = patch('pysplit.timers.now', return_value=records.null_time)
 then = datetime.datetime(2017, 3, 24, 19, 1, 1, 500000)  # 1 min, 1.5 sec later
 patched_then = patch('pysplit.timers.now', return_value=then)
+cfg.content = {
+    'speedrun_name': 'a_speedrun',
+    'split_names': ('level_1', 'level_2', 'level_3'),
+    'nocolour': True,
+    'runner_name': 'a_runner'
+}
 
 
 class TestSimpleTimer(TestCase):
     def setUp(self):
-        self.timer = timers.SimpleTimer('a_speedrun', ('level_1', 'level_2', 'level_3'), colour=False)
+        self.timer = timers.SimpleTimer()
 
     def test_run(self):
         pass
@@ -67,10 +72,11 @@ class TestSimpleTimer(TestCase):
             p.assert_called_with('level_1  0:01:01.50  0:01:01.50', end='\r')
 
 
-class TestPBTimer(TestCase):
+class TestCompTimer(TestCase):
     def setUp(self):
-        self.timer = timers.PBTimer('a_speedrun', ('level_1', 'level_2', 'level_3'), colour=False)
-        self.timer.pb = speedruns[0]
+        with patch('pysplit.timers.ComparisonTimer.get_comp_run'):
+            self.timer = timers.ComparisonTimer()
+            self.timer.comp_run = speedruns[0]
 
     def test_render_split_comparison(self):
         self.timer.current_split.start_time = records.null_time

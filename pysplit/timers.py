@@ -2,6 +2,7 @@ import datetime
 import threading
 from time import sleep
 from pysplit import records
+from pysplit.config import cfg
 
 
 def now():
@@ -29,10 +30,10 @@ class SimpleTimer(threading.Thread):
         None: '\033[0m'
     }
 
-    def __init__(self, name, split_names, colour=True):
+    def __init__(self):
         super().__init__()
-        self.name = name
-        self.splits = self._get_splits(split_names)
+        self.name = cfg['speedrun_name']
+        self.splits = self._get_splits(cfg['split_names'])
         self.split_idx = 0
         self.total_time = None
         self.start_time = None
@@ -41,7 +42,7 @@ class SimpleTimer(threading.Thread):
         self.cancel = None
         self.level_offset = max(len(s.name) for s in self.splits)
         self.max_width = self.level_offset + len(self.header)
-        self.colour = colour
+        self.colour = not cfg['nocolour']
 
     def run(self):
         print('_' * self.max_width)
@@ -138,24 +139,27 @@ class SimpleTimer(threading.Thread):
         return text
 
 
-class PBTimer(SimpleTimer):
-    header = SimpleTimer.header + '       Best'
+class ComparisonTimer(SimpleTimer):
+    header = SimpleTimer.header + '       Compare'
 
-    def __init__(self, name, split_config, colour=True):
-        super().__init__(name, split_config, colour)
-        self.pb = records.get_best_run(name)
-        if not self.pb:
-            self.pb = records.SpeedRun(name, splits=self.splits)
+    def __init__(self):
+        super().__init__()
+        self.comp_run = self.get_comp_run()
+        if not self.comp_run:
+            self.comp_run = records.SpeedRun(cfg['speedrun_name'], cfg['runner_name'], splits=self.splits)
+
+    def get_comp_run(self):
+        raise NotImplementedError
 
     @property
-    def current_pb_split(self):
-        return self.pb.splits[self.split_idx]
+    def current_comp_split(self):
+        return self.comp_run.splits[self.split_idx]
 
     def render_current_split_comparison(self):
-        if self.current_pb_split.time_elapsed is None:
+        if self.current_comp_split.time_elapsed is None:
             return ''
 
-        best_possible_end = self.current_split.start_time + self.current_pb_split.time_elapsed
+        best_possible_end = self.current_split.start_time + self.current_comp_split.time_elapsed
         return self.render_comparison(now() - best_possible_end)
 
     def render_comparison(self, timedelta):
@@ -181,13 +185,13 @@ class PBTimer(SimpleTimer):
     def render_current_time(self):
         _now = now()
         print(
-            '{name}{spaces}  {time}  {split}  {pb} ({comparison})'.format(
+            '{name}{spaces}  {time}  {split}  {comp} ({diff})'.format(
                 name=self.current_split.name,
                 spaces=' ' * (self.level_offset - len(self.current_split.name)),
                 time=self.render_timedelta(_now - self.splits[0].start_time),
                 split=self.render_timedelta(_now - self.last_split_end),
-                pb=self.render_timedelta(self.current_pb_split.time_elapsed),
-                comparison=self.render_current_split_comparison()
+                comp=self.render_timedelta(self.current_comp_split.time_elapsed),
+                diff=self.render_current_split_comparison()
             ),
             end='\r'
         )
@@ -195,14 +199,47 @@ class PBTimer(SimpleTimer):
     def finish(self):
         self.total_time = now() - self.start_time
         print(
-            '{name}{spaces}  {time}  {split}  {pb} ({comparison})'.format(
+            '{name}{spaces}  {time}  {split}  {comp} ({diff})'.format(
                 name='Total',
                 spaces=' ' * (self.level_offset - 5),
                 time=self.render_timedelta(self.total_time),
                 split=' ' * 10,
-                pb=self.render_timedelta(self.pb.total_time),
-                comparison=self.render_comparison(self.total_time - self.pb.total_time),
+                comp=self.render_timedelta(self.comp_run.total_time),
+                diff=self.render_comparison(self.total_time - self.comp_run.total_time),
             )
         )
         s = records.SpeedRun(self.name, records.generate_id('runs'), splits=self.splits)
         s.push()
+
+
+class SpecificRunTimer(ComparisonTimer):
+    def get_comp_run(self):
+        return records.get_run(self.name, self.comp_run)
+
+
+class PBTimer(ComparisonTimer):
+    header = SimpleTimer.header + '       Best'
+
+    def get_comp_run(self):
+        return records.get_pb_run(self.name)
+
+
+class WRTimer(ComparisonTimer):
+    header = SimpleTimer.header + '       Record'
+
+    def get_comp_run(self):
+        return records.get_best_run(self.name)
+
+
+class AverageTimer(ComparisonTimer):
+    header = SimpleTimer.header + '       Average'
+
+    def get_comp_run(self):
+        return records.get_average_run(self.name)
+
+timer_map = {
+    'practice': SimpleTimer,
+    'specific': SpecificRunTimer,
+    'pb': PBTimer,
+    'average': AverageTimer
+}

@@ -1,12 +1,11 @@
-from pysplit.timers import SimpleTimer, PBTimer
+from pysplit.timers import timer_map
 from pysplit.config import cfg
 
 
 def main():
     cfg.configure()
-    cls = SimpleTimer if cfg['practice'] else PBTimer
+    s = timer_map[cfg['timer_type']](cfg)
 
-    s = cls(cfg['speedrun_name'], cfg['split_names'], cfg['colour'])
     s.start()
     try:
         for _ in s.splits:

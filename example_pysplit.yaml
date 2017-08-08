@@ -1,0 +1,13 @@
+split_names:
+    a_run:
+        - level1
+        - level2
+        - level3
+
+    another_run: a_run
+
+nocolour: false
+
+timer_type: pb  # practice, pb, wr, average
+
+record_db: null

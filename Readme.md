@@ -15,9 +15,9 @@ PySplit handles `KeyboardInterrupt` and `EOFError`, so the timer can be stopped 
 
 ## Configuration
 Configurations for level names can be supplied in `~/.pysplit.yaml`. To add level names for a run category, for example
-Halo 1 Legendary, add the category name with a list of names under `level_names`:
+Halo 1 Legendary, add the category name with a list of names under `split_names`:
 
-    level_names:
+    split_names:
         'Halo 1 Legendary':
           - Pillar of Autumn
           - Halo
@@ -34,7 +34,7 @@ Because PySplit saves the index of each split (i.e, whether it is level 1, 2, et
 be changed at any time - just make sure the list of levels is still the same length. You can also automatically assign a
 run category's level names to another category by specifying a category name instead of a list of level names.
 
-    level_names:
+    split_names:
         'Halo 1 Legendary':
           - Reset here a lot
           - (Don't) save marines
@@ -66,7 +66,7 @@ using the `sqlite3` C library:
 ## Roadmap
 - Recursive aliasing, e.g:
 
-    level_names:
+    split_names:
         'Halo 1 Legendary':
           - Pillar of Autumn
           - Halo
@@ -75,9 +75,6 @@ using the `sqlite3` C library:
         'Halo 1 Easy': 'Halo 1 Legendary'
         'Halo 1 Normal': 'Halo 1 Easy'
 
-- Unified config/command line arguments
-    - everything apart from the run category should be configurable via either the config file or cmd args
-    - cmd args should take precedence, if present
 - More command line tools for looking at past runs
     - best run, avg run, best possible run
 - Gold splits

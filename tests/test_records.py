@@ -1,11 +1,12 @@
 from unittest import TestCase
 from unittest.mock import Mock, patch
 from pysplit import records
+from pysplit.config import cfg
 from datetime import datetime, timedelta
 from tests.data import speedruns
 
-records.record_db = ':memory:'
-cursor = records.cursor()
+cfg.content = {'runner_name': 'a_runner'}
+records.connect(':memory:')
 
 
 for run in speedruns:
@@ -14,17 +15,22 @@ for run in speedruns:
 
 class TestRecords(TestCase):
     def test_get_run(self):
-        s = records.SpeedRun('a_speedrun', 'c')
-        self.assertEqual(s, speedruns[2])
+        obs = records.get_run('a_speedrun', 'c')
+        self.assertEqual(obs, speedruns[2])
 
     def test_get_best_run(self):
         obs = records.get_best_run('a_speedrun')
+        self.assertEqual(obs, speedruns[1])
+
+    def test_get_pb_run(self):
+        obs = records.get_pb_run('a_speedrun')
         self.assertEqual(obs, speedruns[1])
 
     def test_get_average_run(self):
         obs = records.get_average_run('a_speedrun')
         exp = records.SpeedRun(
             'a_speedrun',
+            'a_runner',
             'avg_run',
             (
                 records.Split('a_speedrun', 1, records.null_time, '2017-03-24 19:05:09'),
@@ -52,7 +58,7 @@ class TestSplit(TestCase):
 
 class TestSpeedRun(TestCase):
     def setUp(self):
-        self.speedrun = records.SpeedRun('a_speedrun', 'a', speedruns[0].splits)
+        self.speedrun = records.SpeedRun('a_speedrun', 'a_runner', 'a', speedruns[0].splits)
 
     def test_get_splits(self):
         patched_fetch = patch(
@@ -73,11 +79,11 @@ class TestSpeedRun(TestCase):
         self.assertEqual(self.speedrun.total_time, timedelta(minutes=15, seconds=30))
 
     def test_push(self):
-        with patch('pysplit.records.generate_id', return_value='an_id'), patch('pysplit.records.cursor', return_value=Mock()) as p:
+        with patch('pysplit.records.generate_id', return_value='an_id'), patch('pysplit.records.cursor') as p:
             self.speedrun.push()
 
         for query, data in (
-            ('INSERT INTO runs VALUES (?, ?, ?, ?)', ('a', 'a_speedrun', self.speedrun.splits[0].start_time, 930.0)),
+            ('INSERT INTO runs VALUES (?, ?, ?, ?, ?)', ('a', 'a_speedrun', 'a_runner', self.speedrun.splits[0].start_time, 930.0)),
             ('INSERT INTO splits VALUES (?, ?, ?, ?, ?)', ('an_id', 'a', 1, self.speedrun.splits[0].start_time, self.speedrun.splits[0].end_time)),
             ('INSERT INTO splits VALUES (?, ?, ?, ?, ?)', ('an_id', 'a', 2, self.speedrun.splits[1].start_time, self.speedrun.splits[1].end_time)),
             ('INSERT INTO splits VALUES (?, ?, ?, ?, ?)', ('an_id', 'a', 3, self.speedrun.splits[2].start_time, self.speedrun.splits[2].end_time)),
