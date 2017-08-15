@@ -12,7 +12,8 @@ cfg.content = {
     'speedrun_name': 'a_speedrun',
     'split_names': ('level_1', 'level_2', 'level_3'),
     'nocolour': True,
-    'runner_name': 'a_runner'
+    'runner_name': 'a_runner',
+    'compare': 'a_run'
 }
 
 
@@ -73,9 +74,12 @@ class TestSimpleTimer(TestCase):
 
 
 class TestCompTimer(TestCase):
+    timer_cls = timers.ComparisonTimer
+
     def setUp(self):
-        with patch('pysplit.timers.ComparisonTimer.get_comp_run'):
-            self.timer = timers.ComparisonTimer()
+        with patch('pysplit.timers.ComparisonTimer.get_comp_run'), patch('pysplit.records.get_gold_splits'):
+            self.timer = self.timer_cls()
+            self.timer.gold_splits = speedruns[1]
             self.timer.comp_run = speedruns[0]
 
     def test_render_split_comparison(self):
@@ -96,3 +100,19 @@ class TestCompTimer(TestCase):
             with patch('pysplit.timers.now', return_value=datetime.datetime(2017, 3, 24, 19, 6)):
                 self.timer.render_current_time()
                 p.assert_called_with('level_1  0:06:00.00  0:06:00.00  0:05:30.00 (+0:00:30.00)', end='\r')
+
+
+class TestSpecificRunTimer(TestCompTimer):
+    timer_cls = timers.SpecificRunTimer
+
+
+class TestPBTimer(TestCompTimer):
+    timer_cls = timers.PBTimer
+
+
+class TestWRTimer(TestCompTimer):
+    timer_cls = timers.WRTimer
+
+
+class TestAverageTimer(TestCompTimer):
+    timer_cls = timers.AverageTimer

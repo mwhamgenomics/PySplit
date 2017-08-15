@@ -144,6 +144,7 @@ class ComparisonTimer(SimpleTimer):
 
     def __init__(self):
         super().__init__()
+        self.gold_splits = records.get_gold_splits(self.name)
         self.comp_run = self.get_comp_run()
         if not self.comp_run:
             self.comp_run = records.SpeedRun(cfg['speedrun_name'], cfg['runner_name'], splits=self.splits)
@@ -214,7 +215,7 @@ class ComparisonTimer(SimpleTimer):
 
 class SpecificRunTimer(ComparisonTimer):
     def get_comp_run(self):
-        return records.get_run(self.name, self.comp_run)
+        return records.get_run(self.name, cfg['compare'])
 
 
 class PBTimer(ComparisonTimer):

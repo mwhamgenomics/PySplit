@@ -91,12 +91,12 @@ class Split:
         """
         assert all((self.run_name, self.index, self.start_time, self.end_time))
         cursor().execute(
-            'INSERT INTO splits VALUES (?, ?, ?, ?, ?)',
-            (generate_id('splits'), run_id, self.index, self.start_time, self.end_time)
+            'INSERT INTO splits VALUES (?, ?, ?, ?, ?, ?)',
+            (generate_id('splits'), run_id, self.run_name, self.index, self.start_time, self.end_time)
         )
 
     def __repr__(self):
-        return _repr(self, ('name', 'index', 'time_elapsed'))
+        return _repr(self, ('name', 'run_name', 'index', 'time_elapsed'))
 
     def __eq__(self, other):
         return _eq(self, other, ('run_name', 'index', 'start_time', 'end_time'))
@@ -129,10 +129,19 @@ def connect(record_db):
     db = sqlite3.connect(record_db)
     _cursor = db.cursor()
 
-    _cursor.execute('CREATE TABLE IF NOT EXISTS runs (id text UNIQUE, name text, runner text, start_time text, total_time numeric)')
+    _cursor.execute(
+        'CREATE TABLE IF NOT EXISTS runs ('
+        'id text UNIQUE, name text, runner text, start_time text, total_time numeric'
+        ')'
+    )
     _cursor.execute(
         'CREATE TABLE IF NOT EXISTS splits ('
-        'id text UNIQUE, run_id text REFERENCES runs(id), idx numeric, start_time text, end_time text'
+        'id text UNIQUE, '
+        'run_id text REFERENCES runs(id), '
+        'run_name text REFERENCES runs(name), '
+        'idx numeric, '
+        'start_time text, '
+        'end_time text'
         ')'
     )
 
@@ -193,3 +202,18 @@ def get_average_run(name):
             )
         )
     return SpeedRun(name, cfg['runner_name'], _id='avg_run', splits=average_splits)
+
+
+def get_gold_splits(name):
+    cursor().execute('SELECT idx, start_time, end_time FROM splits WHERE run_name=?', (name,))
+    data = cursor().fetchall()
+
+    gold_splits = {}
+
+    for d in data:
+        s = Split(name, *d)
+        i = s.index
+        if i not in gold_splits or s.time_elapsed < gold_splits[i].time_elapsed:
+            gold_splits[i] = s
+
+    return [gold_splits[k] for k in sorted(gold_splits)]

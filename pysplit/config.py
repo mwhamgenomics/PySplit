@@ -18,6 +18,7 @@ class Config:
             a.add_argument('--timer_type')
             a.add_argument('--runner_name')
             a.add_argument('--config')
+            a.add_argument('--compare', help='Compare with a specific run (only works with --timer_type specific)')
             self._cmd_args = a.parse_args()
         return self._cmd_args
 

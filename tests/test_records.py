@@ -33,11 +33,20 @@ class TestRecords(TestCase):
             'a_runner',
             'avg_run',
             (
-                records.Split('a_speedrun', 1, records.null_time, '2017-03-24 19:05:09'),
-                records.Split('a_speedrun', 2, records.null_time, '2017-03-24 19:04:42'),
-                records.Split('a_speedrun', 3, records.null_time, '2017-03-24 19:05:21')
+                records.Split('a_speedrun', 1, records.null_time, '2017-03-24 19:04:58.5'),
+                records.Split('a_speedrun', 2, records.null_time, '2017-03-24 19:04:48'),
+                records.Split('a_speedrun', 3, records.null_time, '2017-03-24 19:05:16.5')
             )
         )
+        self.assertEqual(obs, exp)
+
+    def test_get_gold_splits(self):
+        obs = records.get_gold_splits('a_speedrun')
+        exp = [
+            records.Split('a_speedrun', 1, '2017-03-22 11:40:53', '2017-03-22 11:45:50'),
+            records.Split('a_speedrun', 2, '2017-03-21 13:06:45', '2017-03-21 13:11:10'),
+            records.Split('a_speedrun', 3, '2017-03-22 11:51:01', '2017-03-22 11:56:14')
+        ]
         self.assertEqual(obs, exp)
 
 
@@ -84,8 +93,8 @@ class TestSpeedRun(TestCase):
 
         for query, data in (
             ('INSERT INTO runs VALUES (?, ?, ?, ?, ?)', ('a', 'a_speedrun', 'a_runner', self.speedrun.splits[0].start_time, 930.0)),
-            ('INSERT INTO splits VALUES (?, ?, ?, ?, ?)', ('an_id', 'a', 1, self.speedrun.splits[0].start_time, self.speedrun.splits[0].end_time)),
-            ('INSERT INTO splits VALUES (?, ?, ?, ?, ?)', ('an_id', 'a', 2, self.speedrun.splits[1].start_time, self.speedrun.splits[1].end_time)),
-            ('INSERT INTO splits VALUES (?, ?, ?, ?, ?)', ('an_id', 'a', 3, self.speedrun.splits[2].start_time, self.speedrun.splits[2].end_time)),
+            ('INSERT INTO splits VALUES (?, ?, ?, ?, ?, ?)', ('an_id', 'a', 'a_speedrun', 1, self.speedrun.splits[0].start_time, self.speedrun.splits[0].end_time)),
+            ('INSERT INTO splits VALUES (?, ?, ?, ?, ?, ?)', ('an_id', 'a', 'a_speedrun', 2, self.speedrun.splits[1].start_time, self.speedrun.splits[1].end_time)),
+            ('INSERT INTO splits VALUES (?, ?, ?, ?, ?, ?)', ('an_id', 'a', 'a_speedrun', 3, self.speedrun.splits[2].start_time, self.speedrun.splits[2].end_time)),
         ):
             p.return_value.execute.assert_any_call(query, data)

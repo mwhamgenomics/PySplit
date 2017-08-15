@@ -54,27 +54,16 @@ run category's level names to another category by specifying a category name ins
 By default, PySplit uses a splits file in `~/.pysplit.sqlite`. A PySplit splits file is a SQLite database with the
 following schema:
 
-    CREATE TABLE runs (id text UNIQUE, name text, start_time text, total_time numeric);
+    CREATE TABLE runs (id text UNIQUE, name text, runner text, start_time text, total_time numeric);
     CREATE TABLE splits (id text UNIQUE, run_id text REFERENCES runs(id), idx numeric, start_time text, end_time text);
 
 PySplit uses the `sqlite3` Python library to push and pull data from this file. It can also be interacted with directly
 using the `sqlite3` C library:
 
-    sqlite> SELECT id, start_time FROM runs WHERE name="Halo 1 Legendary";
+    sqlite> SELECT id, runner, start_time, total_time FROM runs WHERE name="Halo 1 Legendary" ORDER BY total_time ASC;
 
 
 ## Roadmap
-- Recursive aliasing, e.g:
-
-    split_names:
-        'Halo 1 Legendary':
-          - Pillar of Autumn
-          - Halo
-          - ...
-
-        'Halo 1 Easy': 'Halo 1 Legendary'
-        'Halo 1 Normal': 'Halo 1 Easy'
-
 - More command line tools for looking at past runs
     - best run, avg run, best possible run
 - Gold splits
