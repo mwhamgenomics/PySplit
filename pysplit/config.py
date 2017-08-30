@@ -14,11 +14,14 @@ class Config:
             a = argparse.ArgumentParser()
             a.add_argument('speedrun_name')
             a.add_argument('--split_names', nargs='+', default=None)
-            a.add_argument('--nocolour', dest='colour', action='store_false')
-            a.add_argument('--timer_type')
+            a.add_argument('--nocolour', action='store_true')
             a.add_argument('--runner_name')
             a.add_argument('--config')
-            a.add_argument('--compare', help='Compare with a specific run (only works with --timer_type specific)')
+            a.add_argument(
+                '--compare',
+                help="Valid values: 'pb', 'wr', 'average', 'practice', or any run ID",
+                default='practice'
+            )
             self._cmd_args = a.parse_args()
         return self._cmd_args
 
@@ -39,9 +42,9 @@ class Config:
 
         self.content = {
             'speedrun_name': speedrun_name,
-            'split_names': cmd_args.splits or self._resolve_split_names(speedrun_name),
+            'split_names': cmd_args.split_names or self._resolve_split_names(speedrun_name),
             'nocolour': cmd_args.nocolour or file_cfg.get('nocolour', False),
-            'timer_type': cmd_args.timer_type or file_cfg.get('timer_type', 'standard_timer'),
+            'compare': cmd_args.compare or file_cfg.get('compare', 'practice'),
             'runner_name': cmd_args.runner_name or file_cfg['runner_name']
         }
 

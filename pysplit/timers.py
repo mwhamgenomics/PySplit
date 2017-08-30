@@ -24,6 +24,7 @@ class SimpleTimer(threading.Thread):
         'light_red': '\033[91m',
         'light_green': '\033[92m',
         'yellow': '\033[93m',
+        'gold': '\033[93m',
         'light_blue': '\033[94m',
         'pink': '\033[95m',
         'light_cyan': '\033[96m',
@@ -44,8 +45,11 @@ class SimpleTimer(threading.Thread):
         self.max_width = self.level_offset + len(self.header)
         self.colour = not cfg['nocolour']
 
+    def preamble(self):
+        print('Started at %s' % str(self.start_time)[:-7])
+        print(' ' * self.level_offset + '  ' + self.header)
+
     def run(self):
-        print('_' * self.max_width)
         if len(self.name) < self.max_width:
             ndashes = int((self.max_width - len(self.name) - 2) / 2)
             print('-' * ndashes + ' ' + self.name + ' ' + '-' * ndashes)
@@ -55,8 +59,7 @@ class SimpleTimer(threading.Thread):
         self.start_time = now()
         self.current_split.start_time = now()
 
-        print('Started at %s' % str(self.start_time)[:-7])
-        print(' ' * self.level_offset + '  ' + self.header)
+        self.preamble()
         while not self.done:
             self.render_current_time()
             sleep(0.001)
@@ -141,106 +144,115 @@ class SimpleTimer(threading.Thread):
 
 class ComparisonTimer(SimpleTimer):
     header = SimpleTimer.header + '       Compare'
+    comp_aliases = {
+        'pb': 'Personal best',
+        'wr': 'World record',
+        'average': 'Average'
+    }
 
     def __init__(self):
         super().__init__()
         self.gold_splits = records.get_gold_splits(self.name)
         self.comp_run = self.get_comp_run()
-        if not self.comp_run:
-            self.comp_run = records.SpeedRun(cfg['speedrun_name'], cfg['runner_name'], splits=self.splits)
 
     def get_comp_run(self):
-        raise NotImplementedError
+        if cfg['compare'] == 'pb':
+            return records.get_pb_run(self.name)
+        elif cfg['compare'] == 'wr':
+            return records.get_best_run(self.name)
+        elif cfg['compare'] == 'average':
+            return records.get_average_run(self.name)
+        else:
+            return records.get_run(self.name, cfg['compare'])
 
     @property
     def current_comp_split(self):
         return self.comp_run.splits[self.split_idx]
 
+    @property
+    def current_gold_split(self):
+        return self.gold_splits[self.split_idx]
+
     def render_current_split_comparison(self):
-        if self.current_comp_split.time_elapsed is None:
+        if self.comp_run is None:
             return ''
 
-        best_possible_end = self.current_split.start_time + self.current_comp_split.time_elapsed
-        return self.render_comparison(now() - best_possible_end)
+        _now = now()
 
-    def render_comparison(self, timedelta):
+        time_elapsed = _now - self.current_split.start_time
+
+        if time_elapsed < self.current_comp_split.time_elapsed:
+            colour = 'green'
+        else:
+            colour = 'red'
+
+        comp_end = self.current_split.start_time + self.current_comp_split.time_elapsed
+        comp = _now - comp_end
+        return self.render_comparison(comp, colour)
+
+    def render_comparison(self, timedelta, colour):
         """
         Format a timedelta as, e.g, '+01:30:25.50' or '-00:03:43.24'. Will be coloured red if + and green if -.
         :param datetime.timedelta timedelta:
         """
-        float_secs = (86400 * timedelta.days) + timedelta.seconds + (timedelta.microseconds / 1000000)
-        if float_secs < 0:
-            float_secs *= -1
+        t = timedelta.total_seconds()
+        if t < 0:
+            t *= -1
             sign = '-'
-            colour = self.colours['light_green']
         else:
             sign = '+'
-            colour = self.colours['red']
 
-        mins, sec = divmod(float_secs, 60)
+        mins, sec = divmod(t, 60)
         hrs, mins = divmod(mins, 60)
         sec, usec = divmod(sec, 1)
         usec *= 100
-        return self.render_text('%s%d:%02d:%02d.%02d' % (sign, hrs, mins, sec, usec), colour)
+        return self.render_text('%s%d:%02d:%02d.%02d' % (sign, hrs, mins, sec, usec), self.colours[colour])
 
     def render_current_time(self):
         _now = now()
         print(
-            '{name}{spaces}  {time}  {split}  {comp} ({diff})'.format(
+            '{name}{spaces}  {time}  {split}  {comp}'.format(
                 name=self.current_split.name,
                 spaces=' ' * (self.level_offset - len(self.current_split.name)),
                 time=self.render_timedelta(_now - self.splits[0].start_time),
                 split=self.render_timedelta(_now - self.last_split_end),
-                comp=self.render_timedelta(self.current_comp_split.time_elapsed),
-                diff=self.render_current_split_comparison()
+                comp=self.render_current_split_comparison()
             ),
             end='\r'
         )
 
+    def preamble(self):
+        print('Started at %s' % str(self.start_time)[:-7])
+
+        if self.comp_run is None:
+            if cfg['compare'] == 'pb':
+                msg = 'Personal best is this run'
+            else:
+                msg = 'No compare run available'
+        else:
+            msg = '%s run is %s' % (self.comp_aliases[cfg['compare']], self.render_timedelta(self.comp_run.total_time))
+            if self.comp_run.runner != cfg['runner_name']:
+                msg += ' by %s' % self.comp_run.runner
+
+            end = self.comp_run.splits[-1].end_time
+            msg += ' from %s' % datetime.datetime(end.year, end.month, end.day, end.hour, end.minute, end.second)
+
+        print(msg)
+        print(' ' * self.level_offset + '  ' + self.header)
+
     def finish(self):
         self.total_time = now() - self.start_time
-        print(
-            '{name}{spaces}  {time}  {split}  {comp} ({diff})'.format(
-                name='Total',
-                spaces=' ' * (self.level_offset - 5),
-                time=self.render_timedelta(self.total_time),
-                split=' ' * 10,
-                comp=self.render_timedelta(self.comp_run.total_time),
-                diff=self.render_comparison(self.total_time - self.comp_run.total_time),
-            )
+        msg = '{name}{spaces}  {time}  {split}'.format(
+            name='Total',
+            spaces=' ' * (self.level_offset - 5),
+            time=self.render_timedelta(self.total_time),
+            split=' ' * 10
         )
-        s = records.SpeedRun(self.name, records.generate_id('runs'), splits=self.splits)
+        if self.comp_run:
+            diff = self.total_time - self.comp_run.total_time
+            colour = 'green' if diff.total_seconds() < 0 else 'red'
+            msg += '  {comp}'.format(comp=self.render_comparison(self.total_time - self.comp_run.total_time, colour))
+
+        print(msg)
+        s = records.SpeedRun(self.name, cfg['runner_name'], records.generate_id('runs'), splits=self.splits)
         s.push()
-
-
-class SpecificRunTimer(ComparisonTimer):
-    def get_comp_run(self):
-        return records.get_run(self.name, cfg['compare'])
-
-
-class PBTimer(ComparisonTimer):
-    header = SimpleTimer.header + '       Best'
-
-    def get_comp_run(self):
-        return records.get_pb_run(self.name)
-
-
-class WRTimer(ComparisonTimer):
-    header = SimpleTimer.header + '       Record'
-
-    def get_comp_run(self):
-        return records.get_best_run(self.name)
-
-
-class AverageTimer(ComparisonTimer):
-    header = SimpleTimer.header + '       Average'
-
-    def get_comp_run(self):
-        return records.get_average_run(self.name)
-
-timer_map = {
-    'practice': SimpleTimer,
-    'specific': SpecificRunTimer,
-    'pb': PBTimer,
-    'average': AverageTimer
-}

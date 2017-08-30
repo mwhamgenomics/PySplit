@@ -1,7 +1,5 @@
 import datetime
 import sqlite3
-import string
-from random import choice
 from os.path import expanduser
 from pysplit.config import cfg
 
@@ -102,24 +100,22 @@ class Split:
         return _eq(self, other, ('run_name', 'index', 'start_time', 'end_time'))
 
 
-def generate_id(table_name):
+def generate_id(table_name, _len=6):
     """
     Return a string not already present in the id column of a given table
     :param str table_name: 'runs' or 'splits'
+    :param int _len: length of ID to return
     """
-    new_id = _random_string()
+    cursor().execute('SELECT id from %s ORDER BY id DESC LIMIT 1' % table_name,)
+    data = cursor().fetchone()
 
-    cursor().execute('SELECT id from %s WHERE id=?' % table_name, (new_id,))
-    results = cursor().fetchall()
+    if data:
+        latest_id = int(data[0])
+    else:
+        latest_id = 0
 
-    if results:
-        return generate_id(table_name)
-
-    return new_id
-
-
-def _random_string(_len=6):
-    return ''.join(choice(string.ascii_lowercase + string.digits) for _ in range(_len))
+    new_id = str(latest_id + 1)
+    return '0' * (_len - len(new_id)) + new_id
 
 
 def connect(record_db):

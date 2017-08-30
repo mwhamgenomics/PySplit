@@ -7,7 +7,6 @@ split_names:
     another_run: a_run
 
 nocolour: false
-
 timer_type: pb  # practice, pb, wr, average
-
 record_db: null
+runner_name: a_runner

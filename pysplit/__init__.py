@@ -1,10 +1,13 @@
-from pysplit.timers import timer_map
+from pysplit.timers import SimpleTimer, ComparisonTimer
 from pysplit.config import cfg
 
 
 def main():
     cfg.configure()
-    s = timer_map[cfg['timer_type']](cfg)
+    if cfg['compare'] == 'practice':
+        s = SimpleTimer()
+    else:
+        s = ComparisonTimer()
 
     s.start()
     try:
