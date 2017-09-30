@@ -1,7 +1,6 @@
+import requests
 import datetime
-import sqlite3
-from os.path import expanduser
-from pysplit.config import cfg
+from pysplit.config import client_config as cfg
 
 db = None
 _cursor = None
@@ -25,22 +24,29 @@ class SpeedRun:
 
     def _get_splits(self):
         assert self.id
-        cursor().execute('SELECT idx, start_time, end_time FROM splits WHERE run_id=? ORDER BY idx ASC', (self.id,))
-        data = cursor().fetchall()
-        return tuple(Split(self.name, *s) for s in data)
+        data = requests.get('http://localhost:5000/api/splits', params={'run_id': self.id}).json()
+        return tuple(
+            Split(self.name, d['idx'], d.get('start_time'), d.get('end_time'))
+            for d in data
+        )
 
     @property
     def total_time(self):
         return self.splits[-1].end_time - self.splits[0].start_time
 
     def push(self):
-        cursor().execute(
-            'INSERT INTO runs VALUES (?, ?, ?, ?, ?)',
-            (self.id, self.name, self.runner, self.splits[0].start_time, self.total_time.total_seconds())
+        r = requests.post(
+            'http://localhost:5000/api/runs',
+            json={
+                'name': self.name,
+                'runner': self.runner,
+                'start_time': str(self.splits[0].start_time),
+                'total_time': self.total_time.total_seconds()
+            }
         )
+        new_run_id = r.json()['id']
         for s in self.splits:
-            s._push(self.id)
-        db.commit()
+            s._push(new_run_id)
 
     def __repr__(self):
         return _repr(self, ('name', 'id', 'splits'))
@@ -88,9 +94,15 @@ class Split:
         :param str run_id: speedrun ID to associate with this split
         """
         assert all((self.run_name, self.index, self.start_time, self.end_time))
-        cursor().execute(
-            'INSERT INTO splits VALUES (?, ?, ?, ?, ?, ?)',
-            (generate_id('splits'), run_id, self.run_name, self.index, self.start_time, self.end_time)
+        requests.post(
+            'http://localhost:5000/api/splits',
+            json={
+                'run_id': run_id,
+                'run_name': self.run_name,
+                'idx': self.index,
+                'start_time': str(self.start_time),
+                'end_time': str(self.end_time)
+            }
         )
 
     def __repr__(self):
@@ -100,74 +112,22 @@ class Split:
         return _eq(self, other, ('run_name', 'index', 'start_time', 'end_time'))
 
 
-def generate_id(table_name, _len=6):
-    """
-    Return a string not already present in the id column of a given table
-    :param str table_name: 'runs' or 'splits'
-    :param int _len: length of ID to return
-    """
-    cursor().execute('SELECT id from %s ORDER BY id DESC LIMIT 1' % table_name,)
-    data = cursor().fetchone()
-
+def get_run(run_id):
+    data = requests.get('http://localhost:5000/api/runs', params={'id': run_id}).json()[0]
     if data:
-        latest_id = int(data[0])
-    else:
-        latest_id = 0
-
-    new_id = str(latest_id + 1)
-    return '0' * (_len - len(new_id)) + new_id
+        return SpeedRun(data['name'], data['runner'], data['id'])
 
 
-def connect(record_db):
-    global db
-    global _cursor
-
-    db = sqlite3.connect(record_db)
-    _cursor = db.cursor()
-
-    _cursor.execute(
-        'CREATE TABLE IF NOT EXISTS runs ('
-        'id text UNIQUE, name text, runner text, start_time text, total_time numeric'
-        ')'
-    )
-    _cursor.execute(
-        'CREATE TABLE IF NOT EXISTS splits ('
-        'id text UNIQUE, '
-        'run_id text REFERENCES runs(id), '
-        'run_name text REFERENCES runs(name), '
-        'idx numeric, '
-        'start_time text, '
-        'end_time text'
-        ')'
-    )
-
-
-def cursor():
-    global _cursor
-    if _cursor is None:
-        connect(cfg.get('record_db', expanduser('~/.pysplit.sqlite')))
-    return _cursor
-
-
-def get_run(name, run_id):
-    cursor().execute('SELECT runner, id from runs WHERE id=?', (run_id,))
-    data = cursor().fetchone()
+def get_pb_run(name, runner):
+    data = requests.get('http://localhost:5000/api/runs', params={'name': name, 'runner': runner}).json()[0]
     if data:
-        return SpeedRun(name, *data)
-
-
-def get_pb_run(name):
-    cursor().execute('SELECT runner, id FROM runs WHERE name=? AND runner=? ORDER BY total_time ASC', (name, cfg['runner_name']))
-    data = cursor().fetchone()
-    if data:
-        return SpeedRun(name, *data)
+        return SpeedRun(data['name'], data['runner'], data['id'])
 
 
 def get_best_run(name):
-    cursor().execute('SELECT runner, id FROM runs WHERE name=? ORDER BY total_time ASC', (name,))
-    data = cursor().fetchone()
+    data = requests.get('http://localhost:5000/api/runs', params={'name': name}).json()[0]
     if data:
-        return SpeedRun(name, *data)
+        return SpeedRun(data['name'], data['runner'], data['id'])
 
 
 def _get_average_elapsed_time(splits):
@@ -181,9 +141,8 @@ def get_average_run(name):
     Return a hypothetical SpeedRun, where the splits are averages across all previous runs.
     :param str name:
     """
-    cursor().execute('SELECT id FROM runs WHERE name=? AND runner=?', (name, cfg['runner_name']))
-    data = cursor().fetchall()
-    runs = [SpeedRun(name, cfg['runner_name'], d[0]) for d in data]
+    data = requests.get('http://localhost:5000/api/runs', params={'name': name, 'runner': cfg['runner_name']}).json()
+    runs = [SpeedRun(name, cfg['runner_name'], d['id']) for d in data]
 
     template_splits = runs[0].splits
     average_splits = []
@@ -201,13 +160,11 @@ def get_average_run(name):
 
 
 def get_gold_splits(name):
-    cursor().execute('SELECT idx, start_time, end_time FROM splits WHERE run_name=?', (name,))
-    data = cursor().fetchall()
-
+    data = requests.get('http://localhost:5000/api/splits', params={'run_name': name}).json()
     gold_splits = {}
 
     for d in data:
-        s = Split(name, *d)
+        s = Split(name, d['idx'], d.get('start_time'), d.get('end_time'), d.get('split_name'))
         i = s.index
         if i not in gold_splits or s.time_elapsed < gold_splits[i].time_elapsed:
             gold_splits[i] = s

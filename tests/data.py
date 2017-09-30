@@ -1,10 +1,10 @@
-from pysplit import records
+from pysplit.client import records
 
 speedruns = (
     records.SpeedRun(
         'a_speedrun',
         'another_runner',
-        'a',
+        1,
         (
             records.Split('a_speedrun', 1, '2017-03-20 12:00:00', '2017-03-20 12:05:30'),  # 5:30
             records.Split('a_speedrun', 2, '2017-03-20 12:05:30', '2017-03-20 12:10:00'),  # 4:30
@@ -14,7 +14,7 @@ speedruns = (
     records.SpeedRun(
         'a_speedrun',
         'a_runner',
-        'b',
+        2,
         (
             records.Split('a_speedrun', 1, '2017-03-21 13:01:45', '2017-03-21 13:06:45'),  # 5:00
             records.Split('a_speedrun', 2, '2017-03-21 13:06:45', '2017-03-21 13:11:10'),  # 4:25
@@ -24,7 +24,7 @@ speedruns = (
     records.SpeedRun(
         'a_speedrun',
         'a_runner',
-        'c',
+        3,
         (
             records.Split('a_speedrun', 1, '2017-03-22 11:40:53', '2017-03-22 11:45:50'),  # 4:57
             records.Split('a_speedrun', 2, '2017-03-22 11:45:50', '2017-03-22 11:51:01'),  # 5:11

@@ -1,23 +1,26 @@
-from pysplit import timers, records
-from pysplit.config import cfg
-from unittest import TestCase
-from unittest.mock import patch
-from tests.data import speedruns
 import datetime
+from unittest.mock import patch
+from pysplit.client import timers, records
+from pysplit.config import client_config, server_config
+from tests.test_pysplit import TestPySplit
+from tests.data import speedruns
 
-patched_now = patch('pysplit.timers.now', return_value=records.null_time)
+patched_now = patch('pysplit.client.timers.now', return_value=records.null_time)
 then = datetime.datetime(2017, 3, 24, 19, 1, 1, 500000)  # 1 min, 1.5 sec later
-patched_then = patch('pysplit.timers.now', return_value=then)
-cfg.content = {
+patched_then = patch('pysplit.client.timers.now', return_value=then)
+client_config.content = {
     'speedrun_name': 'a_speedrun',
-    'split_names': ('level_1', 'level_2', 'level_3'),
     'nocolour': True,
     'runner_name': 'a_runner',
     'compare': 'a_run'
 }
 
+server_config.content = {
+    'split_names': {'a_speedrun': ['level_1', 'level_2', 'level_3']}
+}
 
-class TestSimpleTimer(TestCase):
+
+class TestSimpleTimer(TestPySplit):
     def setUp(self):
         self.timer = timers.SimpleTimer()
 
@@ -33,7 +36,7 @@ class TestSimpleTimer(TestCase):
 
     def test_get_splits(self):
         self.assertEqual(
-            self.timer._get_splits(['this', 'that', 'other']),
+            self.timer._get_splits(),
             [
                 records.Split('a_speedrun', 1, split_name='this'),
                 records.Split('a_speedrun', 2, split_name='that'),
@@ -54,7 +57,7 @@ class TestSimpleTimer(TestCase):
     def test_split(self):
         self.timer.splits[0].start_time = records.null_time
         self.assertEqual(self.timer.split_idx, 0)
-        with patched_then, patch('pysplit.timers.SimpleTimer.render_current_time'):
+        with patched_then, patch('pysplit.client.timers.SimpleTimer.render_current_time'):
             self.timer.split()
             self.assertEqual(self.timer.split_idx, 1)
             self.assertEqual(self.timer.splits[0].end_time, then)
@@ -73,11 +76,11 @@ class TestSimpleTimer(TestCase):
             p.assert_called_with('level_1  0:01:01.50  0:01:01.50', end='\r')
 
 
-class TestCompTimer(TestCase):
+class TestCompTimer(TestPySplit):
     timer_cls = timers.ComparisonTimer
 
     def setUp(self):
-        with patch.object(self.timer_cls, 'get_comp_run'), patch('pysplit.records.get_gold_splits'):
+        with patch.object(self.timer_cls, 'get_comp_run'), patch('pysplit.client.records.get_gold_splits'):
             self.timer = self.timer_cls()
             self.timer.gold_splits = speedruns[1].splits
             self.timer.comp_run = speedruns[0]
@@ -86,7 +89,7 @@ class TestCompTimer(TestCase):
         self.timer.current_split.start_time = records.null_time
         with patched_then:
             self.assertEqual(self.timer.render_current_split_comparison(), '-0:04:28.50')
-        with patch('pysplit.timers.now', return_value=datetime.datetime(2017, 3, 24, 19, 5, 31, 500000)):
+        with patch('pysplit.client.timers.now', return_value=datetime.datetime(2017, 3, 24, 19, 5, 31, 500000)):
             self.assertEqual(self.timer.render_current_split_comparison(), '+0:00:01.50')
 
     def test_render_current_time(self):
@@ -98,6 +101,6 @@ class TestCompTimer(TestCase):
                 self.timer.render_current_time()
                 p.assert_called_with('level_1  0:01:01.50  0:01:01.50  -0:04:28.50', end='\r')
 
-            with patch('pysplit.timers.now', return_value=datetime.datetime(2017, 3, 24, 19, 6)):
+            with patch('pysplit.client.timers.now', return_value=datetime.datetime(2017, 3, 24, 19, 6)):
                 self.timer.render_current_time()
                 p.assert_called_with('level_1  0:06:00.00  0:06:00.00  +0:00:30.00', end='\r')

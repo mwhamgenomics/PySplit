@@ -1,8 +1,9 @@
 import datetime
 import threading
+import requests
 from time import sleep
-from pysplit import records
-from pysplit.config import cfg
+from pysplit.client import records
+from pysplit.config import client_config as cfg
 
 
 def now():
@@ -34,7 +35,7 @@ class SimpleTimer(threading.Thread):
     def __init__(self):
         super().__init__()
         self.name = cfg['speedrun_name']
-        self.splits = self._get_splits(cfg['split_names'])
+        self.splits = self._get_splits()
         self.split_idx = 0
         self.total_time = None
         self.start_time = None
@@ -100,7 +101,8 @@ class SimpleTimer(threading.Thread):
 
         return self.render_text('%s%d:%02d:%02d.%02d' % (sign, hrs, mins, sec, usec), colour)
 
-    def _get_splits(self, split_names):
+    def _get_splits(self):
+        split_names = requests.get('http://localhost:5000/api/split_names', params={'run_name': self.name}).json()
         return [records.Split(self.name, split_names.index(n) + 1, split_name=n) for n in split_names]
 
     @property
@@ -157,13 +159,13 @@ class ComparisonTimer(SimpleTimer):
 
     def get_comp_run(self):
         if cfg['compare'] == 'pb':
-            return records.get_pb_run(self.name)
+            return records.get_pb_run(self.name, cfg['runner_name'])
         elif cfg['compare'] == 'wr':
             return records.get_best_run(self.name)
         elif cfg['compare'] == 'average':
             return records.get_average_run(self.name)
         else:
-            return records.get_run(self.name, cfg['compare'])
+            return records.get_run(cfg['compare'])
 
     @property
     def current_comp_split(self):
@@ -254,5 +256,5 @@ class ComparisonTimer(SimpleTimer):
             msg += '  {comp}'.format(comp=self.render_comparison(self.total_time - self.comp_run.total_time, colour))
 
         print(msg)
-        s = records.SpeedRun(self.name, cfg['runner_name'], records.generate_id('runs'), splits=self.splits)
+        s = records.SpeedRun(self.name, cfg['runner_name'], splits=self.splits)
         s.push()

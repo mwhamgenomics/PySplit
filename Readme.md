@@ -2,9 +2,13 @@
 PySplit is a [LiveSplit](https://github.com/LiveSplit/LiveSplit)-style speedrun timer, run via the command line.
 
 ## Usage
-To run from source:
+PySplit consists of a client and server. To run the server from source:
 
-    python bin/run.py <speedrun_name> --splits <level_1> <level_2> ...
+    python bin/server.py
+
+The client can then be run separately:
+
+    python bin/client.py <speedrun_name> --splits <level_1> <level_2> ...
 
 If you have a config entry for `speedrun_name`, then `--splits` is not needed.
 Optional arguments:
@@ -68,3 +72,4 @@ using the `sqlite3` C library:
     - best run, avg run, best possible run
 - Gold splits
 - Screenshot for intro to docs
+- Web interface

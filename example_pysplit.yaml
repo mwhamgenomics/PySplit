@@ -1,10 +1,10 @@
 split_names:
-    a_run:
-        - level1
-        - level2
-        - level3
+    a_speedrun:
+        - level_1
+        - level_2
+        - level_3
 
-    another_run: a_run
+    another_run: a_speedrun
 
 nocolour: false
 timer_type: pb  # practice, pb, wr, average
