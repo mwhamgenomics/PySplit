@@ -1,34 +1,62 @@
-from pysplit.client import records
+from datetime import datetime
 
-speedruns = (
-    records.SpeedRun(
-        'a_speedrun',
-        'another_runner',
-        1,
-        (
-            records.Split('a_speedrun', 1, '2017-03-20 12:00:00', '2017-03-20 12:05:30'),  # 5:30
-            records.Split('a_speedrun', 2, '2017-03-20 12:05:30', '2017-03-20 12:10:00'),  # 4:30
-            records.Split('a_speedrun', 3, '2017-03-20 12:10:00', '2017-03-20 12:15:30')   # 5:30
+
+runs = (
+    {
+        'name': 'a_run',
+        'runner': 'me',
+        'start_time': datetime(2018, 2, 19, 12),
+        'splits': (
+            {'idx': 0, 'start_time': datetime(2018, 2, 19, 12), 'end_time': datetime(2018, 2, 19, 12, 3, 59), 'total_time': 239},
+            {'idx': 1, 'start_time': datetime(2018, 2, 19, 12, 3, 59)}
         )
-    ),
-    records.SpeedRun(
-        'a_speedrun',
-        'a_runner',
-        2,
-        (
-            records.Split('a_speedrun', 1, '2017-03-21 13:01:45', '2017-03-21 13:06:45'),  # 5:00
-            records.Split('a_speedrun', 2, '2017-03-21 13:06:45', '2017-03-21 13:11:10'),  # 4:25
-            records.Split('a_speedrun', 3, '2017-03-21 13:11:10', '2017-03-21 13:16:30')   # 5:20
+    },
+    {
+        'name': 'a_run',
+        'runner': 'me',
+        'start_time': datetime(2018, 2, 19, 12, 30),
+        'end_time': datetime(2018, 2, 19, 12, 41, 1),
+        'total_time': 661,
+        'splits': (
+            {'idx': 0, 'start_time': datetime(2018, 2, 19, 12, 30), 'end_time': datetime(2018, 2, 19, 12, 34, 1), 'total_time': 241},
+            {'idx': 1, 'start_time': datetime(2018, 2, 19, 12, 34, 1), 'end_time': datetime(2018, 2, 19, 12, 38, 1), 'total_time': 240},
+            {'idx': 2, 'start_time': datetime(2018, 2, 19, 12, 38, 1), 'end_time': datetime(2018, 2, 19, 12, 41, 1), 'total_time': 180},
         )
-    ),
-    records.SpeedRun(
-        'a_speedrun',
-        'a_runner',
-        3,
-        (
-            records.Split('a_speedrun', 1, '2017-03-22 11:40:53', '2017-03-22 11:45:50'),  # 4:57
-            records.Split('a_speedrun', 2, '2017-03-22 11:45:50', '2017-03-22 11:51:01'),  # 5:11
-            records.Split('a_speedrun', 3, '2017-03-22 11:51:01', '2017-03-22 11:56:14')   # 5:13
+    },
+    {
+        'name': 'a_run',
+        'runner': 'me',
+        'start_time': datetime(2018, 2, 19, 13, 30),
+        'end_time': datetime(2018, 2, 19, 13, 40, 46),
+        'total_time': 646,
+        'splits': (
+            {'idx': 0, 'start_time': datetime(2018, 2, 19, 13, 30), 'end_time': datetime(2018, 2, 19, 13, 34), 'total_time': 240},
+            {'idx': 1, 'start_time': datetime(2018, 2, 19, 13, 34), 'end_time': datetime(2018, 2, 19, 13, 37, 40), 'total_time': 220},
+            {'idx': 2, 'start_time': datetime(2018, 2, 19, 13, 37, 40), 'end_time': datetime(2018, 2, 19, 13, 40, 46), 'total_time': 186},
         )
-    )
+    },
+    {
+        'name': 'a_run',
+        'runner': 'someone',
+        'start_time': datetime(2018, 2, 19, 13, 30),
+        'end_time': datetime(2018, 2, 19, 13, 40, 45),
+        'total_time': 645,
+        'splits': (
+            {'idx': 0, 'start_time': datetime(2018, 2, 19, 13, 30), 'end_time': datetime(2018, 2, 19, 13, 34), 'total_time': 240},
+            {'idx': 1, 'start_time': datetime(2018, 2, 19, 13, 34), 'end_time': datetime(2018, 2, 19, 13, 37, 39), 'total_time': 219},
+            {'idx': 2, 'start_time': datetime(2018, 2, 19, 13, 37, 39), 'end_time': datetime(2018, 2, 19, 13, 40, 45), 'total_time': 186},
+        )
+    },
+    {
+        'name': 'a_run',
+        'runner': 'me',
+        'start_time': datetime(2018, 2, 19, 14, 30),
+        'end_time': datetime(2018, 2, 19, 14, 41, 3),
+        'total_time': 663,
+        'splits': (
+            {'idx': 0, 'start_time': datetime(2018, 2, 19, 14, 30), 'end_time': datetime(2018, 2, 19, 14, 34, 3), 'total_time': 243},
+            {'idx': 1, 'start_time': datetime(2018, 2, 19, 14, 34, 3), 'end_time': datetime(2018, 2, 19, 14, 38, 13), 'total_time': 250},
+            {'idx': 2, 'start_time': datetime(2018, 2, 19, 14, 38, 13), 'end_time': datetime(2018, 2, 19, 14, 41, 3), 'total_time': 170},
+        )
+    }
 )

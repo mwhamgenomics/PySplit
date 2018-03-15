@@ -8,12 +8,15 @@ class Config:
     _file_cfg = None
     content = None
 
+    def __init__(self):
+        self.argparser = argparse.ArgumentParser()
+
     @property
     def cmd_args(self):
         if self._cmd_args is None:
-            a = argparse.ArgumentParser()
-            self._add_args(a)
-            self._cmd_args = a.parse_args()
+            self.argparser.add_argument('--config')
+            self._add_args()
+            self._cmd_args = self.argparser.parse_args()
         return self._cmd_args
 
     @property
@@ -26,8 +29,8 @@ class Config:
                     self._file_cfg = yaml.safe_load(f)
         return self._file_cfg
 
-    def _add_args(self, argparser):
-        argparser.add_argument('--config')
+    def _add_args(self):
+        pass
 
     def configure(self):
         raise NotImplementedError
@@ -40,35 +43,20 @@ class Config:
 
 
 class ClientConfig(Config):
-    def _add_args(self, argparser):
-        super()._add_args(argparser)
-        argparser.add_argument('speedrun_name')
-        argparser.add_argument('--split_names', nargs='+', default=None)
-        argparser.add_argument('--nocolour', action='store_true')
-        argparser.add_argument('--runner_name')
-        argparser.add_argument('--compare', help="Valid values: 'pb', 'wr', 'average', 'practice', or any run ID")
+    def _add_args(self):
+        self.argparser.add_argument('speedrun_name')
+        self.argparser.add_argument('--runner_name')
+        self.argparser.add_argument('--gold_sound')
+        self.argparser.add_argument('--pb_sound')
 
     def configure(self):
-        cmd_args = self.cmd_args
-        file_cfg = self.file_config
-        speedrun_name = cmd_args.speedrun_name
-
         self.content = {
-            'speedrun_name': speedrun_name,
-            'nocolour': cmd_args.nocolour or file_cfg.get('nocolour', False),
-            'compare': cmd_args.compare or file_cfg.get('compare', 'practice'),
-            'runner_name': cmd_args.runner_name or file_cfg['runner_name']
+            'speedrun_name': self.cmd_args.speedrun_name,
+            'split_names': {n: self._resolve_split_names(n) for n in self.file_config['split_names']},
+            'runner_name': self.cmd_args.runner_name or self.file_config['runner_name'],
+            'gold_sound': self.cmd_args.gold_sound or self.file_config.get('gold_sound'),
+            'pb_sound': self.cmd_args.pb_sound or self.file_config.get('pb_sound')
         }
-
-
-class ServerConfig(Config):
-    def configure(self):
-        self.content = {
-            'split_names': {},
-            'record_db': self.cmd_args.record_db or expanduser('~/.pysplit.sqlite')
-        }
-        for speedrun_name in self.file_config['split_names']:
-            self.content['split_names'][speedrun_name] = self._resolve_split_names(speedrun_name)
 
     def _resolve_split_names(self, speedrun_name, splits_alias=None):
         splits = self.file_config['split_names'][splits_alias or speedrun_name]
@@ -81,9 +69,15 @@ class ServerConfig(Config):
         else:
             raise TypeError('Bad type for split names: %s' % _type)
 
-    def _add_args(self, argparser):
-        super()._add_args(argparser)
-        argparser.add_argument('--record_db')
+
+class ServerConfig(Config):
+    def configure(self):
+        self.content = {
+            'record_db': self.cmd_args.record_db or expanduser('~/.pysplit.sqlite')
+        }
+
+    def _add_args(self):
+        self.argparser.add_argument('--record_db')
 
 
 client_config = ClientConfig()

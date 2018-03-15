@@ -16,13 +16,13 @@ def generate_id(table_name):
     Return a string not already present in the id column of a given table
     :param str table_name: 'runs' or 'splits'
     """
-    cursor.execute('SELECT id from %s ORDER BY id DESC LIMIT 1' % table_name,)
+    cursor.execute('SELECT id FROM %s ORDER BY id DESC LIMIT 1' % table_name)
     data = cursor.fetchone()
 
     if data:
         latest_id = int(data[0])
     else:
-        latest_id = 0
+        latest_id = -1
 
     return latest_id + 1
 
@@ -34,7 +34,42 @@ def main_page():
 
 @app.route('/api/run_categories')
 def run_categories():
-    return flask.jsonify(list(cfg['split_names']))
+    cursor.execute('SELECT name FROM runs')
+    return flask.jsonify(list(set(line[0] for line in cursor.fetchall())))
+
+
+@app.route('/api/gold_splits/<run_name>')
+def gold_splits(run_name):
+    _gold_splits = []
+
+    kwargs = {'runs.name': run_name, 'joined_fields': 'runs.name,runs.runner', 'max_results': 1}
+    runner = flask.request.args.get('runs.runner')
+    if runner:
+        kwargs['runs.runner'] = runner
+        kwargs['joined_fields'] = 'runs.runner'
+
+    data = splits.select(order_by='-idx', **kwargs)
+    if not data:
+        return flask.jsonify(_gold_splits)
+
+    max_idx = data[0]['idx']
+    for i in range(max_idx + 1):
+        g = splits.select(order_by='total_time', idx=i, **kwargs)
+        if g:
+            _gold_splits.append(g[0])
+
+    return flask.jsonify(_gold_splits)
+
+
+@app.route('/api/completion_ratio')
+def completion_ratio():
+    run_name = flask.request.args.get('run_name')
+    if not run_name:
+        flask.abort(400, 'This endpoint requires a run_name argument')
+
+    cursor.execute('SELECT count(id), count(total_time) FROM runs WHERE name=?', (run_name,))
+    total, completed = cursor.fetchone()
+    return flask.jsonify({'total': total, 'completed': completed})
 
 
 @app.route('/api/split_names')
@@ -45,95 +80,179 @@ def split_names():
 
     _split_names = cfg['split_names'].get(run_name)
     if not _split_names:
-        flask.abort(404, 'No splits configured for %s' % run_name)
+        flask.abort(404, 'No split names configured for %s' % run_name)
     return flask.jsonify(_split_names)
 
 
-def _build_query(query, params=(), order_stmnt=''):
-    keys = []
-    vals = []
-
-    for k in params:
-        v = flask.request.args.get(k)
-        if v:
-            keys.append(k)
-            vals.append(v)
-
-    if keys:
-        query += 'WHERE ' + ' AND '.join(['%s=?' % k for k in keys])
-
-    query += order_stmnt
-    return query, vals
-
-
-def _handle_insert(table, colnames):
-    payload = flask.request.json.copy()
-    payload['id'] = generate_id(table)
-    _colnames = ('id',) + colnames
-    assert sorted(payload) == sorted(_colnames), 'Payload did not contain all required fields'
-    expr = 'INSERT INTO %s VALUES (%s)' % (table, ', '.join('?' * len(_colnames)))
-    vals = tuple(payload[k] for k in _colnames)
-    cursor.execute(expr, vals)
-    db.commit()
-    app.logger.debug('Inserted into %s: %s', table, payload)
-    return flask.jsonify(payload)
-
-
-@app.route('/api/runs', methods=['GET', 'POST'])
-def runs():
+@app.route('/api/runs', methods=['GET', 'POST', 'PATCH'])
+def api_runs():
     if flask.request.method == 'POST':
-        return _handle_insert('runs', ('name', 'runner', 'start_time', 'total_time'))
+        return runs.insert()
 
-    query, args = _build_query(
-        'SELECT id, name, runner, start_time, total_time from runs ',
-        ('name', 'runner', 'id'),
-        ' ORDER BY total_time ASC'
-    )
+    if flask.request.method == 'PATCH':
+        return runs.update()
 
-    if not args:
+    if not any(flask.request.args.get(f.name) for f in runs.schema):
         cursor.execute('SELECT DISTINCT name from runs')
         data = cursor.fetchall()
         return flask.jsonify([d[0] for d in data])
 
-    cursor.execute(query, args)
-    retmax = flask.request.args.get('retmax')
-    if retmax:
-        data = cursor.fetchmany(int(retmax))
-    else:
-        data = cursor.fetchall()
-
-    data = [
-        {'id': _id, 'name': name, 'runner': runner, 'start_time': start_time, 'total_time': total_time}
-        for _id, name, runner, start_time, total_time in data
-    ]
-    return flask.jsonify(data)
+    return flask.jsonify(runs.select())
 
 
-@app.route('/api/splits', methods=['GET', 'POST'])
-def splits():
+@app.route('/api/splits', methods=['GET', 'POST', 'PATCH'])
+def api_splits():
     if flask.request.method == 'POST':
-        return _handle_insert('splits', ('run_id', 'run_name', 'idx', 'start_time', 'end_time'))
+        return splits.insert()
 
-    query, args = _build_query(
-        'SELECT id, run_id, run_name, idx, start_time, end_time FROM splits ',
-        ('run_id', 'run_name')
-    )
-    if not args:
-        flask.abort(400, 'This endpoint requires a run_id or run_name argument')
+    if flask.request.method == 'PATCH':
+        return splits.update()
 
-    cursor.execute(query, args)
-    data = cursor.fetchall()
+    return flask.jsonify(splits.select())
 
-    data = [
-        {'id': _id, 'run_id': _run_id, 'run_name': run_name, 'idx': idx, 'start_time': start_time, 'end_time': end_time}
-        for _id, _run_id, run_name, idx, start_time, end_time in data
-    ]
-    return flask.jsonify(data)
+
+class Field:
+    def __init__(self, name, data_type):
+        self.name = name
+        self.data_type = data_type
+
+
+class Table:
+    def __init__(self, name, schema, reference):
+        self.name = name
+        self.schema = schema
+        self.reference = reference
+        self.field_names = tuple(f.name for f in self.schema)
+        self.datetimes = tuple(f.name for f in self.schema if f.data_type == 'datetime')
+
+    def select(self, **request_args):
+        fields = ['%s.%s' % (self.name, f.name) for f in self.schema]
+        sql_where = ''
+        sql_join = ''
+        sql_order_by = ''
+
+        request_args.update({k: v for k, v in flask.request.args.items() if k not in request_args})
+        joined_fields = request_args.pop('joined_fields', None)
+        order_by = request_args.pop('order_by', None)
+        retmax = request_args.pop('max_results', None)
+
+        if joined_fields:
+            joined_fields = joined_fields.split(',')
+            fields += joined_fields
+            sql_join = ' INNER JOIN %s ON %s=%s' % self.reference
+
+        sql_query = 'SELECT %s FROM %s' % (', '.join(fields), self.name)
+
+        wheres = []
+        for k, v in request_args.items():
+            if '.' not in k:
+                k = '%s.%s' % (self.name, k)
+            wheres.append((k, v))
+
+        if order_by:
+            direction = 'ASC'
+            if order_by.startswith('-'):
+                order_by = order_by[1:]
+                direction = 'DESC'
+
+            sql_order_by = ' ORDER BY %s.%s %s' % (self.name, order_by, direction)
+
+        if wheres:
+            sql_where = ' WHERE ' + ' AND '.join('%s=?' % k for k, v in wheres)
+            if order_by:
+                sql_where += ' AND %s.%s IS NOT NULL' % (self.name, order_by)
+
+        sql = sql_query + sql_join + sql_where + sql_order_by
+        app.logger.debug('"%s" - %s', sql, wheres)
+
+        try:
+            cursor.execute(sql, tuple(v for k, v in wheres))
+        except sqlite3.OperationalError:
+            raise
+
+        if retmax:
+            data = cursor.fetchmany(int(retmax))
+        else:
+            data = cursor.fetchall()
+
+        return [
+            {k.replace(self.name + '.', ''): v for k, v in zip(fields, d) if v is not None}
+            for d in data
+        ]
+
+    def insert(self):
+        fields = [f.name for f in self.schema]
+        payload = flask.request.json.copy()
+        payload['id'] = generate_id(self.name)
+
+        expr = 'INSERT INTO %s VALUES (%s)' % (self.name, ', '.join('?' * len(fields)))
+        vals = tuple(payload.get(k) for k in fields)
+        cursor.execute(expr, vals)
+        db.commit()
+        app.logger.debug('Inserted into %s: %s', self.name, payload)
+        return flask.jsonify(payload)
+
+    def update(self):
+        payload = flask.request.json.copy()
+        keys = []
+        vals = []
+        uid = payload.pop('id', None)
+        assert uid is not None, 'Need to know the id of the field to update'
+        for k, v in payload.items():
+            keys.append(k)
+            vals.append(v)
+
+        expr = 'UPDATE %s SET %s WHERE id=?;' % (self.name, ', '.join('%s=?' % k for k in keys))
+        cursor.execute(expr, tuple(vals) + (uid,))
+        db.commit()
+        app.logger.debug('Updated %s: %s', self.name, payload)
+        return flask.jsonify(payload)
+
+
+runs = Table(
+    name='runs',
+    schema=(
+        Field('id',         'numeric UNIQUE'),
+        Field('name',       'text'),
+        Field('runner',     'text'),
+        Field('start_time', 'datetime'),
+        Field('end_time',   'datetime'),
+        Field('total_time', 'numeric')
+    ),
+    reference=('splits', 'runs.id', 'splits.run_id')
+)
+
+splits = Table(
+    name='splits',
+    schema=(
+        Field('id',         'numeric UNIQUE'),
+        Field('run_id',     'numeric REFERENCES runs(id)'),
+        Field('idx',        'numeric'),
+        Field('start_time', 'datetime'),
+        Field('end_time',   'datetime'),
+        Field('total_time', 'numeric')
+    ),
+    reference=('runs', 'splits.run_id', 'runs.id')
+)
+
+
+def init_db(record_db):
+    global db
+    global cursor
+
+    db = sqlite3.connect(record_db)
+    cursor = db.cursor()
+
+    for t in (runs, splits):
+        cursor.execute(
+            'CREATE TABLE IF NOT EXISTS %s (%s)' % (
+                t.name,
+                ', '.join('%s %s' % (f.name, f.data_type) for f in t.schema)
+            )
+        )
 
 
 def main(record_db):
-    global db
-    global cursor
     global server
 
     f = logging.Formatter('[%(asctime)s][%(name)s][%(levelname)s] %(message)s', '%Y-%b-%d %H:%M:%S')
@@ -145,24 +264,7 @@ def main(record_db):
         logger.addHandler(h)
         logger.setLevel(logging.INFO)
 
-    db = sqlite3.connect(record_db)
-    cursor = db.cursor()
-
-    cursor.execute(
-        'CREATE TABLE IF NOT EXISTS runs ('
-        'id numeric UNIQUE, name text, runner text, start_time text, total_time numeric'
-        ')'
-    )
-    cursor.execute(
-        'CREATE TABLE IF NOT EXISTS splits ('
-        'id numeric UNIQUE, '
-        'run_id numeric REFERENCES runs(id), '
-        'run_name text REFERENCES runs(name), '
-        'idx numeric, '
-        'start_time text, '
-        'end_time text'
-        ')'
-    )
+    init_db(record_db)
 
     wsgi_container = wsgi.WSGIContainer(app)
     server = httpserver.HTTPServer(wsgi_container)

@@ -8,14 +8,12 @@ PySplit consists of a client and server. To run the server from source:
 
 The client can then be run separately:
 
-    python bin/client.py <speedrun_name> --splits <level_1> <level_2> ...
+    python bin/client.py <speedrun_name> ...
 
-If you have a config entry for `speedrun_name`, then `--splits` is not needed.
-Optional arguments:
-- `--nocolour` - do not use colours in stdout
-- `--practice` - use SimpleTimer, which does not load or save times
-
-PySplit handles `KeyboardInterrupt` and `EOFError`, so the timer can be stopped with `ctrl-C` or `ctrl-D`.
+This enters a curses app with the following controls:
+- return: start/split
+- backspace: stop/reset
+- q: quit
 
 ## Configuration
 Configurations for level names can be supplied in `~/.pysplit.yaml`. To add level names for a run category, for example
@@ -58,11 +56,11 @@ run category's level names to another category by specifying a category name ins
 By default, PySplit uses a splits file in `~/.pysplit.sqlite`. A PySplit splits file is a SQLite database with the
 following schema:
 
-    CREATE TABLE runs (id text UNIQUE, name text, runner text, start_time text, total_time numeric);
-    CREATE TABLE splits (id text UNIQUE, run_id text REFERENCES runs(id), idx numeric, start_time text, end_time text);
+    CREATE TABLE runs (id numeric UNIQUE, name text, runner text, start_time datetime, end_time datetime, total_time numeric);
+    CREATE TABLE splits (id numeric UNIQUE, run_id numeric REFERENCES runs(id), idx numeric, start_time datetime, end_time datetime, total_time numeric);
 
-PySplit uses the `sqlite3` Python library to push and pull data from this file. It can also be interacted with directly
-using the `sqlite3` C library:
+PySplit uses the sqlite3 Python library to push and pull data from this file. It can also be interacted with directly
+in a sqlite3 shell:
 
     sqlite> SELECT id, runner, start_time, total_time FROM runs WHERE name="Halo 1 Legendary" ORDER BY total_time ASC;
 
@@ -70,6 +68,5 @@ using the `sqlite3` C library:
 ## Roadmap
 - More command line tools for looking at past runs
     - best run, avg run, best possible run
-- Gold splits
 - Screenshot for intro to docs
 - Web interface
