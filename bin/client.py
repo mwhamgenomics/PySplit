@@ -1,7 +1,5 @@
-import sys
-from os.path import dirname, abspath
+#!/usr/bin/env python
+from pysplit import client
 
 if __name__ == '__main__':
-    sys.path.append(dirname(dirname(abspath(__file__))))
-    from pysplit.client import main
-    sys.exit(main())
+    client.main()

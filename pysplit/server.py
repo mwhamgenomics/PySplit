@@ -2,8 +2,9 @@ import sys
 import flask
 import sqlite3
 import logging
+import signal
 from tornado import ioloop, httpserver, wsgi, log
-from pysplit.config import server_config as cfg
+from pysplit.config import server_cfg
 
 app = flask.Flask(__name__)
 db = None
@@ -34,8 +35,8 @@ def main_page():
 
 @app.route('/api/run_categories')
 def run_categories():
-    cursor.execute('SELECT name FROM runs')
-    return flask.jsonify(list(set(line[0] for line in cursor.fetchall())))
+    cursor.execute('SELECT DISTINCT name FROM runs')
+    return flask.jsonify(line[0] for line in cursor.fetchall())
 
 
 @app.route('/api/gold_splits/<run_name>')
@@ -72,18 +73,6 @@ def completion_ratio():
     return flask.jsonify({'total': total, 'completed': completed})
 
 
-@app.route('/api/split_names')
-def split_names():
-    run_name = flask.request.args.get('run_name')
-    if not run_name:
-        flask.abort(400, 'This endpoint requires a run_name argument')
-
-    _split_names = cfg['split_names'].get(run_name)
-    if not _split_names:
-        flask.abort(404, 'No split names configured for %s' % run_name)
-    return flask.jsonify(_split_names)
-
-
 @app.route('/api/runs', methods=['GET', 'POST', 'PATCH'])
 def api_runs():
     if flask.request.method == 'POST':
@@ -91,11 +80,6 @@ def api_runs():
 
     if flask.request.method == 'PATCH':
         return runs.update()
-
-    if not any(flask.request.args.get(f.name) for f in runs.schema):
-        cursor.execute('SELECT DISTINCT name from runs')
-        data = cursor.fetchall()
-        return flask.jsonify([d[0] for d in data])
 
     return flask.jsonify(runs.select())
 
@@ -197,7 +181,7 @@ class Table:
         keys = []
         vals = []
         uid = payload.pop('id', None)
-        assert uid is not None, 'Need to know the id of the field to update'
+        assert uid is not None, 'Payload needs the id of the field to update'
         for k, v in payload.items():
             keys.append(k)
             vals.append(v)
@@ -240,6 +224,7 @@ def init_db(record_db):
     global db
     global cursor
 
+    app.logger.info('Using database at %s', record_db)
     db = sqlite3.connect(record_db)
     cursor = db.cursor()
 
@@ -252,8 +237,12 @@ def init_db(record_db):
         )
 
 
-def main(record_db):
+def main():
     global server
+
+    server_cfg.configure()
+    signal.signal(signal.SIGINT, stop)
+    signal.signal(signal.SIGUSR1, advance)
 
     f = logging.Formatter('[%(asctime)s][%(name)s][%(levelname)s] %(message)s', '%Y-%b-%d %H:%M:%S')
     h = logging.StreamHandler(sys.stdout)
@@ -264,23 +253,18 @@ def main(record_db):
         logger.addHandler(h)
         logger.setLevel(logging.INFO)
 
-    init_db(record_db)
+    init_db(server_cfg['record_db'])
 
     wsgi_container = wsgi.WSGIContainer(app)
     server = httpserver.HTTPServer(wsgi_container)
     server.listen(5000)
-    ioloop.IOLoop.instance().start()
+    ioloop.IOLoop.current().start()
 
 
 def stop(sig=None, frame=None):
     server.stop()
-    ioloop.IOLoop.instance().stop()
-    return 0
+    ioloop.IOLoop.current().stop()
 
 
 def advance(sig=None, frame=None):
     pass
-
-
-if __name__ == '__main__':
-    main(server.cfg['record_db'])

@@ -44,28 +44,28 @@ class Config:
 
 class ClientConfig(Config):
     def _add_args(self):
-        self.argparser.add_argument('speedrun_name')
+        self.argparser.add_argument('run_name')
         self.argparser.add_argument('--runner_name')
         self.argparser.add_argument('--gold_sound')
         self.argparser.add_argument('--pb_sound')
 
     def configure(self):
         self.content = {
-            'speedrun_name': self.cmd_args.speedrun_name,
+            'run_name': self.cmd_args.run_name,
             'split_names': {n: self._resolve_split_names(n) for n in self.file_config['split_names']},
             'runner_name': self.cmd_args.runner_name or self.file_config['runner_name'],
             'gold_sound': self.cmd_args.gold_sound or self.file_config.get('gold_sound'),
             'pb_sound': self.cmd_args.pb_sound or self.file_config.get('pb_sound')
         }
 
-    def _resolve_split_names(self, speedrun_name, splits_alias=None):
-        splits = self.file_config['split_names'][splits_alias or speedrun_name]
+    def _resolve_split_names(self, run_name, splits_alias=None):
+        splits = self.file_config['split_names'][splits_alias or run_name]
 
         _type = type(splits)
         if _type in (list, tuple):
             return splits
         elif _type is str:
-            return self._resolve_split_names(speedrun_name, splits)
+            return self._resolve_split_names(run_name, splits)
         else:
             raise TypeError('Bad type for split names: %s' % _type)
 
@@ -80,5 +80,5 @@ class ServerConfig(Config):
         self.argparser.add_argument('--record_db')
 
 
-client_config = ClientConfig()
-server_config = ServerConfig()
+client_cfg = ClientConfig()
+server_cfg = ServerConfig()

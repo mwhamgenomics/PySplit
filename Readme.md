@@ -11,7 +11,7 @@ The client can then be run separately:
     python bin/client.py <speedrun_name> ...
 
 This enters a curses app with the following controls:
-- return: start/split
+- space: start/split
 - backspace: stop/reset
 - q: quit
 

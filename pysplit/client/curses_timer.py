@@ -8,7 +8,7 @@ from os.path import isfile
 from threading import Thread
 from subprocess import check_call
 from pysplit.client import records
-from pysplit.config import client_config as cfg
+from pysplit.config import client_cfg as cfg
 
 
 def now():
@@ -25,12 +25,12 @@ class CursesTimer:
         '',
         '',
         'Status:',
-        'Start/split: return',
+        'Start/split: space',
         'Stop: backspace'
     ]
 
     def __init__(self):
-        self.name = cfg['speedrun_name']
+        self.name = cfg['run_name']
         self._state = 'ready'
         self.descriptors = {}
         self.split_descriptors = []
@@ -41,17 +41,15 @@ class CursesTimer:
         self.split_idx = 0
 
         self.screen = None
-        self._tick_thread = None
         self.current_run = None
         self.pb_run = None
-        self.active = None
+        self.active = True
 
     def init_runs_and_splits(self):
         self.current_run = records.Run({'name': self.name, 'runner': cfg['runner_name']})
         self.pb_run = records.get_pb_run(self.name, cfg['runner_name'])
         self.gold_splits = records.get_gold_splits(self.name)
         self.pb_splits = records.get_pb_splits(self.name, cfg['runner_name'])
-        self.active = True
 
         completed_run = requests.get(
             'http://localhost:5000/api/runs',
@@ -105,14 +103,17 @@ class CursesTimer:
         footer_offset = len(self.split_names) + 3  # 3 lines in the header
         record_time = records.get_best_run(self.name)
 
+        static_descriptors = (
+            Descriptor(1, 0, self.name),
+            Descriptor(2, 0, '_' * self.longest_split_name),
+            Descriptor(footer_offset, 0, '_' * self.longest_split_name),
+            Descriptor(footer_offset + 4, 0, 'Record is 0:00:00.00 by')
+        )
+
         self.descriptors = {
-            'run_name': Descriptor(1, 0, self.name),
-            'separator': Descriptor(2, 0, '_' * self.longest_split_name),
-            'separator_2': Descriptor(footer_offset, 0, '_' * self.longest_split_name),
             'total_time': TimeDeltaDescriptor(footer_offset + 1, 7, datetime.timedelta()),
             'pb_time': TimeDeltaDescriptor(footer_offset + 2, 4, self.pb_run.elapsed_time if self.pb_run else None),
             'sum_of_bests_time': TimeDeltaDescriptor(footer_offset + 3, 14, sum([s.elapsed_time for s in self.gold_splits], datetime.timedelta())),
-            'record_background': Descriptor(footer_offset + 4, 0, 'Record is 0:00:00.00 by'),
             'record_time': TimeDeltaDescriptor(footer_offset + 4, len('Record is '), record_time.elapsed_time if record_time else None),
             'record_holder': Descriptor(footer_offset + 4, len('Record is 0:00:00.00 by '), record_time.data.get('runner', 'unknown') if record_time else ''),
             'status': Descriptor(footer_offset + 6, 8, self._state),
@@ -122,7 +123,7 @@ class CursesTimer:
         for y, l in enumerate(self.footer):
             self.screen.addstr(y + footer_offset, 0, l)
 
-        for d in self.descriptors.values():
+        for d in static_descriptors + tuple(self.descriptors.values()):
             d.add_screen(self.screen)
             d.render()
 
@@ -176,7 +177,7 @@ class CursesTimer:
                         self.stop()
                     else:
                         self.reset()
-                elif key == 10:  # return
+                elif key == 32:  # space
                     if self._state == 'ready':
                         self.start()
                     elif self._state == 'running':
@@ -217,7 +218,7 @@ class CursesTimer:
     @staticmethod
     def play_sound(sound_file):
         if isfile(sound_file):
-            t = Thread(target=check_call, args=(['afplay', sound_file, '-v', '0.8'],))
+            t = Thread(target=check_call, args=(['afplay', sound_file],))
             t.start()
 
 

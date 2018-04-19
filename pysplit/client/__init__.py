@@ -1,9 +1,8 @@
 from pysplit.client.curses_timer import CursesTimer
-from pysplit.config import client_config as cfg
+from pysplit.config import client_cfg
 
 
 def main():
-    cfg.configure()
+    client_cfg.configure()
     s = CursesTimer()
     s.run()
-    return 0
