@@ -1,10 +1,20 @@
 import requests
 import datetime
+from os.path import join
 from pysplit.server import runs, splits
+from pysplit.config import client_cfg
 
-db = None
-_cursor = None
-null_time = datetime.datetime(2017, 3, 24, 19)
+
+class PySplitClientError(Exception):
+    pass
+
+
+def request(method, endpoint, **kwargs):
+    try:
+        r = requests.request(method, join(client_cfg['server_url'], 'api', endpoint), **kwargs)
+        return r.json()
+    except requests.ConnectionError:
+        raise PySplitClientError('No server found') from None
 
 
 def _repr(self, attribs):
@@ -21,7 +31,7 @@ class Entity:
 
     def __init__(self, data=None):
         if isinstance(data, int):  # uid argument
-            self.data = requests.get('http://localhost:5000/api/' + self.schema.name, params={'id': data}).json()[0]
+            self.data = request('get', self.schema.name, params={'id': data})[0]
         else:  # json argument
             self.data = data.copy() or {}
 
@@ -43,12 +53,10 @@ class Entity:
         return serialised_entity
 
     def post(self):
-        r = requests.post('http://localhost:5000/api/' + self.schema.name, json=self.serialise())
-        return r.json()['id']
+        return request('post', self.schema.name, json=self.serialise())['id']
 
     def patch(self):
-        r = requests.patch('http://localhost:5000/api/' + self.schema.name, json=self.serialise())
-        return r
+        return request('patch', self.schema.name, json=self.serialise())
 
     def push(self):
         if 'id' in self.data:
@@ -74,22 +82,19 @@ class Split(Entity):
 
 
 def get_run(run_id):
-    data = requests.get('http://localhost:5000/api/runs', params={'id': run_id}).json()
+    data = request('get', 'runs', params={'id': run_id})
     if data:
         return Run(data[0])
 
 
 def get_pb_run(name, runner):
-    data = requests.get(
-        'http://localhost:5000/api/runs',
-        params={'name': name, 'runner': runner, 'order_by': 'total_time'}
-    ).json()
+    data = request('get', 'runs', params={'name': name, 'runner': runner, 'order_by': 'total_time'})
     if data:
         return Run(data[0])
 
 
 def get_best_run(name):
-    data = requests.get('http://localhost:5000/api/runs', params={'name': name, 'order_by': 'total_time'}).json()
+    data = request('get', 'runs', params={'name': name, 'order_by': 'total_time'})
     if data:
         return Run(data[0])
 
@@ -97,7 +102,7 @@ def get_best_run(name):
 def get_pb_splits(name, runner):
     r = get_pb_run(name, runner)
     if r:
-        data = requests.get('http://localhost:5000/api/splits', params={'run_id': r.data['id'], 'order_by': 'idx'}).json()
+        data = request('get', 'splits', params={'run_id': r.data['id'], 'order_by': 'idx'})
         return [Split(d) for d in data]
 
 
@@ -106,7 +111,7 @@ def get_gold_splits(run_name, runner=None):
     if runner:
         params['runs.runner'] = runner
 
-    data = requests.get('http://localhost:5000/api/gold_splits/' + run_name, params=params).json()
+    data = request('get', 'gold_splits/' + run_name, params=params)
     return [Split(d) for d in data]
 
 
@@ -121,7 +126,7 @@ def get_gold_splits(run_name, runner=None):
 #     Return a hypothetical SpeedRun, where the splits are averages across all previous runs.
 #     :param str name:
 #     """
-#     data = requests.get('http://localhost:5000/api/runs', params={'name': name, 'runner': cfg['runner_name']}).json()
+#     data = request('get', 'runs', params={'name': name, 'runner': cfg['runner_name']})
 #     runs = [SpeedRun(name, cfg['runner_name'], d['id']) for d in data]
 #
 #     template_splits = runs[0].splits

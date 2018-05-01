@@ -14,10 +14,14 @@ class TestRun(TestCase):
         'end_time': '2017-04-13 12:10:00.000000'
     }
 
+    @classmethod
+    def setUpClass(cls):
+        records.client_cfg.content = {'server_url': 'http://localhost:5000'}
+
     def setUp(self):
         self.entity = self.entity_cls(self.json_data)
 
-    @patch('requests.get', return_value=Mock(json=Mock(return_value=[json_data])))
+    @patch('requests.request', return_value=Mock(json=Mock(return_value=[json_data])))
     def test_init(self, mocked_get):
         self.assertEqual(self.entity.data, self.stored_data)
         self.assertEqual(self.entity_cls(0).data, self.stored_data)
@@ -29,15 +33,15 @@ class TestRun(TestCase):
             {'start_time': '2017-04-13 12:00:00.000000', 'end_time': '2017-04-13 12:10:00.000000'}
         )
 
-    @patch('requests.post', return_value=Mock(json=Mock(return_value={'id': 0})))
-    def test_post(self, mocked_post):
+    @patch('requests.request', return_value=Mock(json=Mock(return_value={'id': 0})))
+    def test_post(self, mreq):
         self.assertEqual(self.entity.post(), 0)
-        mocked_post.assert_called_with('http://localhost:5000/api/' + self.entity_cls.schema.name, json=self.serialised_data)
+        mreq.assert_called_with('post', 'http://localhost:5000/api/' + self.entity_cls.schema.name, json=self.serialised_data)
 
-    @patch('requests.patch', return_value=Mock(json=Mock(return_value={'id': 0})))
-    def test_patch(self, mocked_patch):
+    @patch('requests.request', return_value=Mock(json=Mock(return_value={'id': 0})))
+    def test_patch(self, mreq):
         self.entity.patch()
-        mocked_patch.assert_called_with('http://localhost:5000/api/' + self.entity_cls.schema.name, json=self.serialised_data)
+        mreq.assert_called_with('patch', 'http://localhost:5000/api/' + self.entity_cls.schema.name, json=self.serialised_data)
 
     def test_push(self):
         patched_patch = patch.object(self.entity_cls, 'patch')

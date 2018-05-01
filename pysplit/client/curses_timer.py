@@ -1,7 +1,6 @@
 import sys
 import curses
 import datetime
-import requests
 import traceback
 from time import sleep
 from os.path import isfile
@@ -35,6 +34,9 @@ class CursesTimer:
         self.descriptors = {}
         self.split_descriptors = []
         self.split_names = cfg['split_names'].get(self.name)
+        if not self.split_names:
+            raise records.PySplitClientError('No split names configured')
+
         self.longest_split_name = max(len(s) for s in self.split_names)
         self.gold_splits = []
         self.pb_splits = []
@@ -51,23 +53,9 @@ class CursesTimer:
         self.gold_splits = records.get_gold_splits(self.name)
         self.pb_splits = records.get_pb_splits(self.name, cfg['runner_name'])
 
-        completed_run = requests.get(
-            'http://localhost:5000/api/runs',
-            params={
-                'order_by': '-end_time',
-                'name': self.name,
-                'max_results': 1
-            }
-        ).json()
+        completed_run = records.request('get', 'runs', params={'order_by': '-end_time', 'name': self.name, 'max_results': 1})
         if completed_run:
-            data = requests.get(
-                'http://localhost:5000/api/splits',
-                params={
-                    'order_by': '-idx',
-                    'run_id': self.name,
-                    'max_results': 1
-                }
-            ).json()
+            data = records.request('get', 'splits', params={'order_by': '-idx', 'run_id': self.name, 'max_results': 1})
             if data:
                 max_idx = data[0]['idx']
                 assert max_idx == len(self.split_names) - 1, '%s != %s' % (max_idx, len(self.split_names))
@@ -78,6 +66,7 @@ class CursesTimer:
         curses.init_pair(1, curses.COLOR_GREEN, curses.COLOR_BLACK)
         curses.init_pair(2, curses.COLOR_RED, curses.COLOR_BLACK)
         curses.init_pair(3, curses.COLOR_YELLOW, curses.COLOR_BLACK)
+        curses.init_pair(4, 8, curses.COLOR_BLACK)
         curses.noecho()
         curses.cbreak()
         self.screen.keypad(True)
@@ -100,12 +89,16 @@ class CursesTimer:
         self.screen.clear()
         self.split_idx = 0
 
-        footer_offset = len(self.split_names) + 3  # 3 lines in the header
+        footer_offset = len(self.split_names) + 4  # 4 lines in the header
         record_time = records.get_best_run(self.name)
+        completion_ratio = records.request('get', 'completion_ratio', params={'run_name': self.name})
 
         static_descriptors = (
             Descriptor(1, 0, self.name),
-            Descriptor(2, 0, '_' * self.longest_split_name),
+            Descriptor(2, 0, 'Completion ratio:'),
+            Descriptor(3, 0, '_' * self.longest_split_name),
+            Descriptor(3, self.longest_split_name + 2, 'Pace'),
+            Descriptor(3, self.longest_split_name + 15, 'PB time'),
             Descriptor(footer_offset, 0, '_' * self.longest_split_name),
             Descriptor(footer_offset + 4, 0, 'Record is 0:00:00.00 by')
         )
@@ -117,8 +110,9 @@ class CursesTimer:
             'record_time': TimeDeltaDescriptor(footer_offset + 4, len('Record is '), record_time.elapsed_time if record_time else None),
             'record_holder': Descriptor(footer_offset + 4, len('Record is 0:00:00.00 by '), record_time.data.get('runner', 'unknown') if record_time else ''),
             'status': Descriptor(footer_offset + 6, 8, self._state),
+            'completion_ratio': Descriptor(2, 18, '%s/%s' % (completion_ratio['completed'], completion_ratio['total']))
         }
-        self.split_descriptors = [SplitDescriptor(3 + i, 0, self, i) for i in range(len(self.split_names))]
+        self.split_descriptors = [SplitDescriptor(4 + i, 0, self, i) for i in range(len(self.split_names))]
 
         for y, l in enumerate(self.footer):
             self.screen.addstr(y + footer_offset, 0, l)
@@ -240,7 +234,7 @@ class TimeDeltaDescriptor(Descriptor):
     def render(self):
         self.render_timedelta(self.y, self.x, self.thing)
 
-    def render_timedelta(self, y, x, timedelta):
+    def render_timedelta(self, y, x, timedelta, colour_pair=0):
         """Format a timedelta as, e.g, '01:30:25.50' or '-00:03:43.24'"""
         if timedelta is None:
             return
@@ -251,7 +245,7 @@ class TimeDeltaDescriptor(Descriptor):
         sec, usec = divmod(sec, 1)
         usec *= 100
 
-        self.screen.addstr(y, x, '%d:%02d:%02d.%02d' % (hrs, mins, sec, usec))
+        self.screen.addstr(y, x, '%d:%02d:%02d.%02d' % (hrs, mins, sec, usec), curses.color_pair(colour_pair))
 
 
 class SplitDescriptor(TimeDeltaDescriptor):
@@ -267,7 +261,12 @@ class SplitDescriptor(TimeDeltaDescriptor):
 
         if self.timer.pb_splits:
             self.pb_split = self.timer.pb_splits[idx]
-            self._render_pb(datetime.timedelta(seconds=self.pb_split.data['total_time']))
+            self.render_timedelta(
+                y,
+                self.timer.longest_split_name + 15,
+                datetime.timedelta(seconds=self.pb_split.data['total_time']),
+                4
+            )
             self.pb_pace = datetime.timedelta()
             for s in self.timer.pb_splits[:idx + 1]:
                 self.pb_pace += s.elapsed_time
@@ -300,11 +299,14 @@ class SplitDescriptor(TimeDeltaDescriptor):
         sec, usec = divmod(sec, 1)
         usec *= 100
 
-        self.screen.addstr(
-            self.y,
-            self.timer.longest_split_name + 2,
-            '%s%d:%02d:%02d.%02d' % (sign, hrs, mins, sec, usec), curses.color_pair(colour)
-        )
+        total_time = self.now - self.split.data['start_time']
+        if self.gold_split and total_time > self.gold_split.elapsed_time:
+            self.screen.addstr(
+                self.y,
+                self.timer.longest_split_name + 2,
+                '%s%d:%02d:%02d.%02d' % (sign, hrs, mins, sec, usec),
+                curses.color_pair(colour)
+            )
 
     def start(self):
         self.split = records.Split(
@@ -341,13 +343,16 @@ class SplitDescriptor(TimeDeltaDescriptor):
         self.screen.addstr(
             self.y,
             self.timer.longest_split_name + 2,
-            '%s%d:%02d:%02d.%02d' % (sign, hrs, mins, sec, usec), curses.color_pair(colour)
+            '%s%d:%02d:%02d.%02d' % (sign, hrs, mins, sec, usec),
+            curses.color_pair(colour)
         )
 
-        if self.pb_split and total_time > self.pb_split.elapsed_time:
-            pass
-        else:
-            self._render_pb(total_time)
+        self.render_timedelta(
+            self.y,
+            self.timer.longest_split_name + 15,
+            total_time,
+            0
+        )
 
         self.split.data['end_time'] = self.now
         self.split.data['total_time'] = total_time.total_seconds()

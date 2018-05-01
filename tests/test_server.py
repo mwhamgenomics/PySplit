@@ -138,3 +138,7 @@ class TestRecords(TestServer):
             self.get('gold_splits/a_run'),  # community golds
             [runs[0]['splits'][0], runs[3]['splits'][1], runs[4]['splits'][2]]
         )
+
+    def test_completion_ratio(self):
+        obs = self.get('completion_ratio?run_name=a_run')
+        self.assertEqual(obs, {'total': 5, 'completed': 4})

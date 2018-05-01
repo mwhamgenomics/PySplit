@@ -48,6 +48,7 @@ class ClientConfig(Config):
         self.argparser.add_argument('--runner_name')
         self.argparser.add_argument('--gold_sound')
         self.argparser.add_argument('--pb_sound')
+        self.argparser.add_argument('--server_url')
 
     def configure(self):
         self.content = {
@@ -55,7 +56,8 @@ class ClientConfig(Config):
             'split_names': {n: self._resolve_split_names(n) for n in self.file_config['split_names']},
             'runner_name': self.cmd_args.runner_name or self.file_config['runner_name'],
             'gold_sound': self.cmd_args.gold_sound or self.file_config.get('gold_sound'),
-            'pb_sound': self.cmd_args.pb_sound or self.file_config.get('pb_sound')
+            'pb_sound': self.cmd_args.pb_sound or self.file_config.get('pb_sound'),
+            'server_url': self.cmd_args.server_url or self.file_config.get('server_url', 'http://localhost:5000')
         }
 
     def _resolve_split_names(self, run_name, splits_alias=None):
