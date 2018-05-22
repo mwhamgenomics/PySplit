@@ -1,5 +1,6 @@
 import sys
 import curses
+import signal
 import datetime
 import traceback
 from time import sleep
@@ -16,17 +17,6 @@ def now():
 
 class CursesTimer:
     state_loop = ('ready', 'running', 'done', 'stopped')
-    footer = [
-        '',
-        'Total:',
-        'PB:',
-        'Sum of bests:',
-        '',
-        '',
-        'Status:',
-        'Start/split: space',
-        'Stop: backspace'
-    ]
 
     def __init__(self):
         self.name = cfg['run_name']
@@ -46,6 +36,8 @@ class CursesTimer:
         self.current_run = None
         self.pb_run = None
         self.active = True
+
+        signal.signal(signal.SIGUSR1, self.advance)
 
     def init_runs_and_splits(self):
         self.current_run = records.Run({'name': self.name, 'runner': cfg['runner_name']})
@@ -98,9 +90,15 @@ class CursesTimer:
             Descriptor(2, 0, 'Completion ratio:'),
             Descriptor(3, 0, '_' * self.longest_split_name),
             Descriptor(3, self.longest_split_name + 2, 'Pace'),
-            Descriptor(3, self.longest_split_name + 15, 'PB time'),
+            Descriptor(3, self.longest_split_name + 15, 'Time'),
             Descriptor(footer_offset, 0, '_' * self.longest_split_name),
-            Descriptor(footer_offset + 4, 0, 'Record is 0:00:00.00 by')
+            Descriptor(footer_offset + 1, 0, 'Total:'),
+            Descriptor(footer_offset + 2, 0, 'PB:'),
+            Descriptor(footer_offset + 3, 0, 'Sum of bests:'),
+            Descriptor(footer_offset + 4, 0, 'Record is 0:00:00.00 by'),
+            Descriptor(footer_offset + 6, 0, 'Status:'),
+            Descriptor(footer_offset + 7, 0, 'Start/split: space'),
+            Descriptor(footer_offset + 8, 0, 'Stop/reset: backspace')
         )
 
         self.descriptors = {
@@ -113,9 +111,6 @@ class CursesTimer:
             'completion_ratio': Descriptor(2, 18, '%s/%s' % (completion_ratio['completed'], completion_ratio['total']))
         }
         self.split_descriptors = [SplitDescriptor(4 + i, 0, self, i) for i in range(len(self.split_names))]
-
-        for y, l in enumerate(self.footer):
-            self.screen.addstr(y + footer_offset, 0, l)
 
         for d in static_descriptors + tuple(self.descriptors.values()):
             d.add_screen(self.screen)
@@ -155,6 +150,12 @@ class CursesTimer:
             self.current_split.now = _now
             self.current_split.start()
 
+    def advance(self, sig=None, frame=None):
+        if self._state == 'ready':
+            self.start()
+        elif self._state == 'running':
+            self.split()
+
     def run(self):
         exit_status = 0
         try:
@@ -172,10 +173,7 @@ class CursesTimer:
                     else:
                         self.reset()
                 elif key == 32:  # space
-                    if self._state == 'ready':
-                        self.start()
-                    elif self._state == 'running':
-                        self.split()
+                    self.advance()
 
                 elif key < 0:  # no input
                     if self._state == 'running':

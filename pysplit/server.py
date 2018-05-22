@@ -36,7 +36,7 @@ def main_page():
 @app.route('/api/run_categories')
 def run_categories():
     cursor.execute('SELECT DISTINCT name FROM runs')
-    return flask.jsonify(line[0] for line in cursor.fetchall())
+    return flask.jsonify([line[0] for line in cursor.fetchall()])
 
 
 @app.route('/api/gold_splits/<run_name>')
@@ -242,7 +242,6 @@ def main():
 
     server_cfg.configure()
     signal.signal(signal.SIGINT, stop)
-    signal.signal(signal.SIGUSR1, advance)
 
     f = logging.Formatter('[%(asctime)s][%(name)s][%(levelname)s] %(message)s', '%Y-%b-%d %H:%M:%S')
     h = logging.StreamHandler(sys.stdout)
@@ -264,7 +263,3 @@ def main():
 def stop(sig=None, frame=None):
     server.stop()
     ioloop.IOLoop.current().stop()
-
-
-def advance(sig=None, frame=None):
-    pass

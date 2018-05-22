@@ -15,6 +15,7 @@ This enters a curses app with the following controls:
 - backspace: stop/reset
 - q: quit
 
+
 ## Configuration
 Configurations for level names can be supplied in `~/.pysplit.yaml`. To add level names for a run category, for example
 Halo 1 Legendary, add the category name with a list of names under `split_names`:
@@ -65,8 +66,14 @@ in a sqlite3 shell:
     sqlite> SELECT id, runner, start_time, total_time FROM runs WHERE name="Halo 1 Legendary" ORDER BY total_time ASC;
 
 
+## Signal handling
+The server handles SIGINT to stop cleanly. The client handles SIGUSR1 to call `self.advance`. This means that PySplit
+can run in the background under the control of an external process.
+
+
 ## Roadmap
 - More command line tools for looking at past runs
     - best run, avg run, best possible run
 - Screenshot for intro to docs
 - Web interface
+- Configurable controls

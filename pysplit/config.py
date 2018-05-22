@@ -1,6 +1,11 @@
 import yaml
 import argparse
+from yaml.parser import ParserError
 from os.path import expanduser, isfile
+
+
+class PySplitConfigError(Exception):
+    pass
 
 
 class Config:
@@ -26,7 +31,10 @@ class Config:
             self._file_cfg = {}
             if isfile(cfg_file):
                 with open(cfg_file, 'r') as f:
-                    self._file_cfg = yaml.safe_load(f)
+                    try:
+                        self._file_cfg = yaml.safe_load(f)
+                    except ParserError:
+                        raise PySplitConfigError('Config parsing error') from None
         return self._file_cfg
 
     def _add_args(self):
@@ -49,6 +57,7 @@ class ClientConfig(Config):
         self.argparser.add_argument('--gold_sound')
         self.argparser.add_argument('--pb_sound')
         self.argparser.add_argument('--server_url')
+        self.argparser.add_argument('--ls', action='store_true')
 
     def configure(self):
         self.content = {
@@ -57,7 +66,8 @@ class ClientConfig(Config):
             'runner_name': self.cmd_args.runner_name or self.file_config['runner_name'],
             'gold_sound': self.cmd_args.gold_sound or self.file_config.get('gold_sound'),
             'pb_sound': self.cmd_args.pb_sound or self.file_config.get('pb_sound'),
-            'server_url': self.cmd_args.server_url or self.file_config.get('server_url', 'http://localhost:5000')
+            'server_url': self.cmd_args.server_url or self.file_config.get('server_url', 'http://localhost:5000'),
+            'ls': self.cmd_args.ls
         }
 
     def _resolve_split_names(self, run_name, splits_alias=None):
