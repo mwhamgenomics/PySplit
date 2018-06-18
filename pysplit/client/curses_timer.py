@@ -45,6 +45,7 @@ class CursesTimer:
         self.gold_splits = records.get_gold_splits(self.name)
         self.pb_splits = records.get_pb_splits(self.name, cfg['runner_name'])
 
+        # check that the number of configured splits match previous runs
         completed_run = records.request('get', 'runs', params={'order_by': '-end_time', 'name': self.name, 'max_results': 1})
         if completed_run:
             data = records.request('get', 'splits', params={'order_by': '-idx', 'run_id': self.name, 'max_results': 1})
@@ -158,6 +159,9 @@ class CursesTimer:
 
     def run(self):
         exit_status = 0
+        advance = cfg['controls']['advance']
+        stop_reset = cfg['controls']['stop_reset']
+        quit_ = cfg['controls']['quit']
         try:
             self.init_screen()
             self.reset()
@@ -165,14 +169,14 @@ class CursesTimer:
             while self.active:
                 key = self.screen.getch()
 
-                if key == 113:  # q
+                if key == quit_:
                     self.active = False
-                elif key == 127:  # backspace
+                elif key == stop_reset:
                     if self._state == 'running':
                         self.stop()
                     else:
                         self.reset()
-                elif key == 32:  # space
+                elif key == advance:
                     self.advance()
 
                 elif key < 0:  # no input

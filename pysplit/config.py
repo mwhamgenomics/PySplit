@@ -7,6 +7,15 @@ from os.path import expanduser, isfile
 class PySplitConfigError(Exception):
     pass
 
+def query_dict(d, query_string, ret_default=None):
+    result = d.copy()
+    for q in query_string.split('.'):
+        result = result.get(q)
+        if result is None:
+            return ret_default
+
+    return result or ret_default
+
 
 class Config:
     _cmd_args = None
@@ -67,7 +76,12 @@ class ClientConfig(Config):
             'gold_sound': self.cmd_args.gold_sound or self.file_config.get('gold_sound'),
             'pb_sound': self.cmd_args.pb_sound or self.file_config.get('pb_sound'),
             'server_url': self.cmd_args.server_url or self.file_config.get('server_url', 'http://localhost:5000'),
-            'ls': self.cmd_args.ls
+            'ls': self.cmd_args.ls,
+            'controls': {
+                'advance': query_dict(self.file_config, 'controls.advance', ret_default=32),  # space
+                'stop_reset': query_dict(self.file_config, 'controls.stop_reset', ret_default=127),  # backspace
+                'quit': query_dict(self.file_config, 'controls.quit', ret_default=113)  # q
+            }
         }
 
     def _resolve_split_names(self, run_name, splits_alias=None):

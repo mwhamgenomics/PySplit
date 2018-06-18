@@ -10,15 +10,22 @@ The client can then be run separately:
 
     python bin/client.py <speedrun_name> ...
 
-This enters a curses app with the following controls:
+This enters a curses app with the following control defaults:
 - space: start/split
 - backspace: stop/reset
 - q: quit
 
+These controls can be configured in `~/.pysplit.yaml`. Values should be integer key IDs as used by curses:
+
+    controls:
+        advance: 32
+        stop_reset: 127
+        quit: 113
+
 
 ## Configuration
 Configurations for level names can be supplied in `~/.pysplit.yaml`. To add level names for a run category, for example
-Halo 1 Legendary, add the category name with a list of names under `split_names`:
+'Halo 1 Legendary', add the category name under `split_names` with a list of split names:
 
     split_names:
         'Halo 1 Legendary':
@@ -33,19 +40,19 @@ Halo 1 Legendary, add the category name with a list of names under `split_names`
           - Keyes
           - The Maw
 
-Because PySplit saves the index of each split (i.e, whether it is level 1, 2, etc.) and not the name, level names can
-be changed at any time - just make sure the list of levels is still the same length. You can also automatically assign a
+Because PySplit saves the index of each split (i.e, whether it is split 1, 2, etc.) and not the name, level names can be
+changed at any time - just make sure the list of levels is still the same length. You can also automatically assign a
 run category's level names to another category by specifying a category name instead of a list of level names.
 
     split_names:
         'Halo 1 Legendary':
           - Reset here a lot
-          - (Don't) save marines
+          - Betraying teammates
           - TnR
           - Choke door launch here
           - AotCR
           - 343GS
-          - SO MUCH FLOOD
+          - Brown hallways and Flood
           - Lose run here
           - Keyes bump
           - Warthog run
@@ -74,6 +81,6 @@ can run in the background under the control of an external process.
 ## Roadmap
 - More command line tools for looking at past runs
     - best run, avg run, best possible run
-- Screenshot for intro to docs
-- Web interface
-- Configurable controls
+- Web interface?
+- Cross-platform sound
+- Combined client-server entry point
