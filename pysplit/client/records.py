@@ -2,7 +2,7 @@ import requests
 import datetime
 from os.path import join
 from pysplit.server import runs, splits
-from pysplit.config import client_cfg
+from pysplit.config import cfg
 
 
 class PySplitClientError(Exception):
@@ -11,7 +11,7 @@ class PySplitClientError(Exception):
 
 def request(method, endpoint, **kwargs):
     try:
-        r = requests.request(method, join(client_cfg['server_url'], 'api', endpoint), **kwargs)
+        r = requests.request(method, join(cfg['server_url'], 'api', endpoint), **kwargs)
         return r.json()
     except requests.ConnectionError:
         raise PySplitClientError('No server found') from None

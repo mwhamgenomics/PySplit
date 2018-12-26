@@ -8,7 +8,7 @@ from os.path import isfile
 from threading import Thread
 from subprocess import check_call
 from pysplit.client import records
-from pysplit.config import client_cfg as cfg
+from pysplit.config import cfg
 
 
 def now():
@@ -19,7 +19,7 @@ class CursesTimer:
     state_loop = ('ready', 'running', 'done', 'stopped')
 
     def __init__(self):
-        self.name = cfg['run_name']
+        self.name = cfg['positional']
         self._state = 'ready'
         self.descriptors = {}
         self.split_descriptors = []

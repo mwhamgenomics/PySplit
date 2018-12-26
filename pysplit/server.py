@@ -4,7 +4,7 @@ import sqlite3
 import logging
 import signal
 from tornado import ioloop, httpserver, wsgi, log
-from pysplit.config import server_cfg
+from pysplit.config import cfg
 
 app = flask.Flask(__name__)
 db = None
@@ -240,7 +240,6 @@ def init_db(record_db):
 def main():
     global server
 
-    server_cfg.configure()
     signal.signal(signal.SIGINT, stop)
 
     f = logging.Formatter('[%(asctime)s][%(name)s][%(levelname)s] %(message)s', '%Y-%b-%d %H:%M:%S')
@@ -252,11 +251,11 @@ def main():
         logger.addHandler(h)
         logger.setLevel(logging.INFO)
 
-    init_db(server_cfg['record_db'])
+    init_db(cfg['record_db'])
 
     wsgi_container = wsgi.WSGIContainer(app)
     server = httpserver.HTTPServer(wsgi_container)
-    server.listen(5000)
+    server.listen(cfg['port'])
     ioloop.IOLoop.current().start()
 
 

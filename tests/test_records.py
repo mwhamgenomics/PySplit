@@ -16,7 +16,7 @@ class TestRun(TestCase):
 
     @classmethod
     def setUpClass(cls):
-        records.client_cfg.content = {'server_url': 'http://localhost:5000'}
+        records.cfg.content = {'server_url': 'http://localhost:5000'}
 
     def setUp(self):
         self.entity = self.entity_cls(self.json_data)
