@@ -3,12 +3,13 @@ import curses
 import signal
 import datetime
 import traceback
+from functools import partial
 from time import sleep
 from os.path import isfile
-from threading import Thread
-from subprocess import check_call
 from pysplit.client import records
 from pysplit.config import cfg
+from multiprocessing import Process
+from playsound import playsound
 
 
 def now():
@@ -213,9 +214,8 @@ class CursesTimer:
 
     @staticmethod
     def play_sound(sound_file):
-        if isfile(sound_file):
-            t = Thread(target=check_call, args=(['afplay', sound_file],))
-            t.start()
+        if sound_file and isfile(sound_file):
+            Process(target=partial(playsound, sound_file)).start()
 
 
 class Descriptor:
