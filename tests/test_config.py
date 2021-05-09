@@ -1,23 +1,21 @@
-from os.path import join, dirname, abspath
-from unittest import TestCase
-from unittest.mock import Mock
-from pysplit.config import Config, query_dict
+from tests import TestPySplit
+from pysplit.config import cfg
 
 
-class TestConfig(TestCase):
-    def setUp(self):
-        self.cfg = Config()
-        self.cfg._cmd_args = Mock(
-            config=join(dirname(dirname(abspath(__file__))), 'example_pysplit.yaml'),
-            record_db='a_sqlite_file'
+class TestConfig(TestPySplit):
+    def test_config(self):
+        self.assertEqual(cfg['server']['port'], 5000)
+
+    def test_resolve_split_names(self):
+        self.assertDictEqual(
+            {
+                'a_speedrun': ['level_1', 'level_2', 'level_3'],
+                'another_run': ['level_1', 'level_2', 'level_3']
+            },
+            cfg['client']['split_names']
         )
 
-    def test_configure(self):
-        self.cfg.configure()
-        self.assertEqual(self.cfg['record_db'], 'a_sqlite_file')
-
     def test_query_dict(self):
-        d = {'this': {'that': 'other'}}
-        self.assertEqual(query_dict(d, 'this.that'), 'other')
-        self.assertEqual(query_dict(d, 'this'), {'that': 'other'})
-        self.assertEqual(query_dict(d, 'another.more', ret_default='things'), 'things')
+        self.assertEqual(cfg.query('client', 'controls', 'advance'), 32)
+        self.assertEqual(cfg.query('client', 'split_names', 'a_speedrun'), ['level_1', 'level_2', 'level_3'])
+        self.assertEqual(cfg.query('client', 'nonexistent', ret_default='things'), 'things')

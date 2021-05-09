@@ -1,12 +1,37 @@
-split_names:
-    a_speedrun:
-        - level_1
-        - level_2
-        - level_3
+---
 
-    another_run: a_speedrun
+client:
+  # lists of split names for each available run category
+  split_names:
+      a_speedrun:
+          - level_1
+          - level_2
+          - level_3
 
-nocolour: false
-timer_type: pb  # practice, pb, wr, average
-record_db: null
-runner_name: a_runner
+      another_run: a_speedrun
+
+  # gamer tag to run as
+  runner_name: a_runner
+
+  # sound files to be played when a gold split or PB are achieved
+  # default: null
+  gold_sound: path/to/gold_sound.mp3
+  pb_sound: path/to/pb_sound.mp3
+
+  # URL to access the Rest API at, or null to run in standalone mode and interact with a local database directly
+  # default: http://localhost:5000
+  server_url: null
+
+  # ASCII key IDs for custom timer key mappings - defaults shown below
+  controls:
+      advance: 32  # space
+      stop_reset: 127  # backspace/delete
+      quit: 113  # q
+
+
+server:
+  # SQLite database file - default: ~/.pysplit.sqlite
+  record_db: null
+
+  # port to serve the Rest API on - default: 5000
+  port: 5000

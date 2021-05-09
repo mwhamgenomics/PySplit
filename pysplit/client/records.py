@@ -11,7 +11,7 @@ class PySplitClientError(Exception):
 
 def request(method, endpoint, **kwargs):
     try:
-        r = requests.request(method, join(cfg['server_url'], 'api', endpoint), **kwargs)
+        r = requests.request(method, join(cfg.query('client', 'server_url', ret_default='http://localhost:5000'), 'api', endpoint), **kwargs)
         return r.json()
     except requests.ConnectionError:
         raise PySplitClientError('No server found') from None

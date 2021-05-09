@@ -18,12 +18,12 @@ def now():
 class CursesTimer:
     state_loop = ('ready', 'running', 'done', 'stopped')
 
-    def __init__(self):
-        self.name = cfg['positional']
+    def __init__(self, name):
+        self.name = name
         self._state = 'ready'
         self.descriptors = {}
         self.split_descriptors = []
-        self.split_names = cfg['split_names'].get(self.name)
+        self.split_names = cfg['client']['split_names'].get(self.name)
         if not self.split_names:
             raise records.PySplitClientError('No split names configured')
 
@@ -40,10 +40,11 @@ class CursesTimer:
         signal.signal(signal.SIGUSR1, self.advance)
 
     def init_runs_and_splits(self):
-        self.current_run = records.Run({'name': self.name, 'runner': cfg['runner_name']})
-        self.pb_run = records.get_pb_run(self.name, cfg['runner_name'])
+        runner = cfg['client']['runner_name']
+        self.current_run = records.Run({'name': self.name, 'runner': runner})
+        self.pb_run = records.get_pb_run(self.name, runner)
         self.gold_splits = records.get_gold_splits(self.name)
-        self.pb_splits = records.get_pb_splits(self.name, cfg['runner_name'])
+        self.pb_splits = records.get_pb_splits(self.name, runner)
 
         # check that the number of configured splits match previous runs
         completed_run = records.request('get', 'runs', params={'order_by': '-end_time', 'name': self.name, 'max_results': 1})
@@ -145,7 +146,7 @@ class CursesTimer:
             if self.pb_run and total_time > self.pb_run.elapsed_time:
                 pass
             else:
-                self.play_sound(cfg['pb_sound'])
+                self.play_sound(cfg.query('client', 'pb_sound'))
         else:
             self.split_idx += 1
             self.current_split.now = _now
@@ -159,9 +160,9 @@ class CursesTimer:
 
     def run(self):
         exit_status = 0
-        advance = cfg['controls']['advance']
-        stop_reset = cfg['controls']['stop_reset']
-        quit_ = cfg['controls']['quit']
+        advance = cfg.query('client', 'controls', 'advance', ret_default=32)  # space
+        stop_reset = cfg.query('client', 'controls', 'stop_reset', ret_default=127)  # backspace/delete
+        quit_ = cfg.query('client', 'controls', 'quit', ret_default=113)  # q
         try:
             self.init_screen()
             self.reset()
@@ -213,7 +214,7 @@ class CursesTimer:
 
     @staticmethod
     def play_sound(sound_file):
-        if isfile(sound_file):
+        if sound_file and isfile(sound_file):
             t = Thread(target=check_call, args=(['afplay', sound_file],))
             t.start()
 
@@ -339,7 +340,7 @@ class SplitDescriptor(TimeDeltaDescriptor):
         if self.gold_split and total_time > self.gold_split.elapsed_time:
             pass
         else:
-            self.timer.play_sound(cfg['gold_sound'])
+            self.timer.play_sound(cfg.query('client', 'gold_sound'))
             colour = 3
 
         self.screen.addstr(

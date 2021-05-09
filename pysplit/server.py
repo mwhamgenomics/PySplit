@@ -1,3 +1,4 @@
+import os
 import sys
 import flask
 import sqlite3
@@ -237,7 +238,7 @@ def init_db(record_db):
         )
 
 
-def main():
+def main(args):
     global server
 
     signal.signal(signal.SIGINT, stop)
@@ -251,11 +252,11 @@ def main():
         logger.addHandler(h)
         logger.setLevel(logging.INFO)
 
-    init_db(cfg['record_db'])
+    init_db(cfg.query('server', 'record_db', ret_default=os.path.join(os.getenv('HOME'), '.pysplit.sqlite')))
 
     wsgi_container = wsgi.WSGIContainer(app)
     server = httpserver.HTTPServer(wsgi_container)
-    server.listen(cfg['port'])
+    server.listen(cfg.query('server', 'port', ret_default=5000))
     ioloop.IOLoop.current().start()
 
 

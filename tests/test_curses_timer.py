@@ -1,20 +1,10 @@
-from unittest import TestCase
-from pysplit.client import CursesTimer, cfg
+from pysplit.client import CursesTimer
+from tests import TestPySplit
 
 
-class TestCursesTimer(TestCase):
+class TestCursesTimer(TestPySplit):
     def setUp(self):
-        cfg.content = {
-            'positional': 'a_run',
-            'split_names': {
-                'a_run': ['this', 'that', 'other'],
-            },
-            'runner_name': 'me',
-            'pb_sound': None,
-            'gold_sound': None,
-            'controls': {'advance': 'space', 'stop_reset': 'backspace', 'quit': 'q'}
-        }
-        self.timer = CursesTimer()
+        self.timer = CursesTimer('a_speedrun')
 
     def test_init_runs_and_splits(self):
         assert self.timer.current_run is None
